@@ -23,38 +23,46 @@ function createOrderId(){
 bot.onText(/\/start/, (msg) => {
 
 bot.sendMessage(msg.chat.id,
-`📚 Chào mừng đến shop truyện
+`🐸 Chào mừng đến với Truyện Ếch Xanh 🐸
 
-ƯU ĐÃI:
-• Mua từ bộ thứ 3 giảm 20k
-• Bộ thứ 4 trở đi giảm thêm 10k mỗi bộ
+- Chat Box này dùng để xem list truyện, giá và mua truyện trực tiếp qua bot.
 
-Nhấn /list để xem truyện`);
+🤤 ƯU ĐÃI KHI MUA NHIỀU TRUYỆN:
+• Mua từ bộ thứ 3 sẽ được giảm 20k
+• Mua từ bộ thứ 4 trở đi sẽ được giảm thêm 10k mỗi bộ
+• Ví dụ: Mua 3 bộ giảm 20k, mua 4 bộ giảm 30k, mua 5 bộ giảm 40k...
+
+Nhấn /list để xem danh sách truyện`);
 
 });
 
 // LIST TRUYỆN
-bot.onText(/\/list/, (msg)=>{
+bot.onText(/\/list/, (msg) => {
+  let text = "📚 Danh sách truyện:\n\n";
 
-let text="📚 Danh sách truyện:\n\n";
+  books.forEach(b => {
+    text += `-----------------------------\n`;
+    
+    // Tiêu đề truyện + giá
+    if (b.free) {
+      text += `${b.id}*. ${b.name}\n`;
+    } else {
+      text += `${b.id}. ${b.name}\n`;
+    }
+    
+    // Thông tin chi tiết
+    text += `   📖 Số chương: ${b.chapters}\n`;
+    text += `   📏 Độ dài: ${b.chapterLength}\n`;
+    text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+    text += `   📝 Nội dung: ${b.description}\n\n`;
+    text += `   💰 Giá: ${b.free ? "Free" : b.price + "đ"}\n`;
+  });
 
-books.forEach(b=>{
- if(b.free){
-  text+=`${b.id}. ${b.name} – FREE\n`;
- }else{
-  text+=`${b.id}. ${b.name} – ${b.price/1000}k\n`;
- }
-});
+  text += `✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
+  text += `Ví dụ: 1 2 4\n\n`;
 
-text+=`
-\nGõ số truyện để mua
-
-Ví dụ:
-1 2 4
-`;
-
-bot.sendMessage(msg.chat.id,text);
-
+  bot.sendMessage(msg.chat.id, text,
+  { parse_mode: 'Markdown' });
 });
 
 // KHI KHÁCH CHỌN TRUYỆN
@@ -116,22 +124,29 @@ let content = orderId;
 let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
 
 // gửi QR
-bot.sendPhoto(msg.chat.id,qrLink,{
- caption:
-`📦 Bạn đã chọn:
+bot.sendPhoto(msg.chat.id, qrLink, {
+  caption: `📦 **ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG!**
 
-${selected.map(b=>b.name).join("\n")}
+Bạn đã chọn:
+${selected.map(b => `• ${b.name}`).join("\n")}
 
-💰 Tổng tiền: ${total}đ
-🎁 Giảm giá: ${discount}đ
-💳 Thanh toán: ${final}đ
+💰 **Tổng tiền gốc:** ${total.toLocaleString('vi-VN')}đ
+🎁 **Giảm giá:** ${discount.toLocaleString('vi-VN')}đ
+💳 **Số tiền cần thanh toán:** ${final.toLocaleString('vi-VN')}đ
 
-🧾 Mã đơn: ${orderId}
+🧾 **Mã đơn hàng:** ${orderId}
+📝 **Nội dung chuyển khoản chính xác:**  
+\`${content}\`
 
-Nội dung chuyển khoản:
-${content}
+🔗 **Quét mã QR bên trên** hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank) nội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng.
 
-Sau khi thanh toán bot sẽ tự gửi truyện.`
+⏳ Sau khi nhận được thanh toán, bot sẽ **tự động gửi link truyện** cho bạn ngay lập tức.
+
+⚠️ **Lưu ý quan trọng:**  
+Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng liên hệ ngay admin qua @Falris_tn hoặc gửi tin nhắn chứa mã đơn hàng ${orderId} để được hỗ trợ nhanh chóng nhé! Chúng tôi sẽ kiểm tra và xử lý trong thời gian sớm nhất.
+
+Cảm ơn bạn đã ủng hộ! ❤️`,
+  parse_mode: 'Markdown'
 });
 
 }
@@ -172,22 +187,53 @@ let order = orders[orderId];
 
 if(order && !order.paid){
 
- if(order.amount == amount){
-
+if (order.amount == amount) {
   order.paid = true;
 
-  let links = order.books.map(b=>b.link).join("\n");
+  // Chuẩn bị danh sách link đẹp đẽ
+  let bookLinksText = order.books
+    .map((b, index) => {
+      // Tách link nếu có nhiều part (dùng dấu phẩy hoặc " (Part " để phân biệt)
+      let linkParts = b.link.split(', ').map(part => part.trim());
+      
+      let linksDisplay = linkParts
+        .map((part, i) => {
+          if (part.includes('(Part')) {
+            return part; // đã có (Part 1), (Part 2) sẵn
+          } else if (linkParts.length > 1) {
+            return `Link part ${i + 1}: ${part}`;
+          } else {
+            return part;
+          }
+        })
+        .join("\n");
+
+      return `${index + 1}. ${b.name}\n${linksDisplay}`;
+    })
+    .join("\n\n");
 
   bot.sendMessage(order.chatId,
-`✅ Thanh toán thành công!
+`✅ **THANH TOÁN THÀNH CÔNG!**
 
-📚 Link truyện:
+Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã được mở khóa.
 
-${links}
+**Hướng dẫn đọc truyện trên điện thoại qua Link Google Docs:**
+https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing
 
-Cảm ơn bạn đã mua ❤️`);
+---------------------------
 
- }
+**Danh sách truyện của bạn:**
+
+${bookLinksText}
+
+---------------------------
+
+📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, liên hệ admin @Falris_tn nhé!
+
+Chúc bạn đọc truyện vui vẻ! 🔥`,
+    { parse_mode: 'Markdown' }
+  );
+}
 
 }
 
