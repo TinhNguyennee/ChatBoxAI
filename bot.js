@@ -124,15 +124,15 @@ app.post("/sepay", async (req, res) => {
         .join("\n\n");
 
       let successText = partNumber === 1
-        ? `✅ **THANH TOÁN THÀNH CÔNG!**\n\n`
-        : `✅ **Tiếp tục danh sách** (Phần ${partNumber}/${totalParts})\n\n`;
+        ? `✅ THANH TOÁN THÀNH CÔNG!\n\n`
+        : `✅ Tiếp tục danh sách (Phần ${partNumber}/${totalParts})\n\n`;
 
       successText += `Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã mở khóa.\n\n`;
 
       successText += `Hướng dẫn đọc trên điện thoại:\n`;
       successText += `https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing\n\n`;
 
-      successText += `**Truyện của bạn:**\n${chunkLinks}\n\n`;
+      successText += `Truyện của bạn:\n${chunkLinks}\n\n`;
 
       if (partNumber < totalParts) {
         successText += `(Còn phần sau...)\n\n`;
