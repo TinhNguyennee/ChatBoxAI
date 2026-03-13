@@ -165,7 +165,7 @@ Nhấn /list để xem danh sách truyện`);
 });
 
 // LIST TRUYỆN
-bot.onText(/\/list/, async (msg) => {
+bot.onText(/\/list/, (msg) => {
 
 console.log("Hàm getBooks đã được gọi");  // <--- Thêm dòng này để kiểm tra hàm getBooks có được gọi không
 
