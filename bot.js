@@ -183,12 +183,13 @@ bot.onText(/\/list/, async (msg) => {
       chunk.forEach(b => {
         text += `-----------------------------\n\n`;
 
-        if (b.free) {
-          text += `${b.id}*. ${b.name}\n`;
-        } else {
-          text += `${b.id}. ${b.name}\n`;
-        }
-
+        // if (b.free) {
+        //   text += `${b.id}. ${b.name}\n`;
+        // } else {
+        //   text += `${b.id}. ${b.name}\n`;
+        // }
+        
+        text += `${b.id}. ${b.name}\n`;
         text += `   📖 Số chương: ${b.chapters}\n`;
         text += `   📏 Độ dài: ${b.chapterLength}\n`;
         text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
