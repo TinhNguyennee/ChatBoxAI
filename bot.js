@@ -182,7 +182,7 @@ console.log("Hàm getBooks đã được gọi");  // <--- Thêm dòng này đ�
 
 
     if (b.free) {
-      text += `${b.id}. ${b.name}\n`;
+      text += `${b.id}*. ${b.name}\n`;
     } else {
       text += `${b.id}. ${b.name}\n`;
     }
