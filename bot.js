@@ -13,6 +13,18 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }  // Bắt buộc với Neon
 });
 
+// Khởi tạo Express app ngay từ đầu
+const app = express();
+app.use(bodyParser.json());
+
+// Nơi lưu đơn hàng tạm thời (trong RAM)
+const orders = {};
+
+// Tạo mã đơn
+function createOrderId() {
+  return "OD" + Math.floor(Math.random() * 1000000);
+}
+
 // Test kết nối lúc start server
 pool.connect((err, client, release) => {
   if (err) {
@@ -44,13 +56,91 @@ async function getBooks() {
   }
 }
 
-// Nơi lưu đơn hàng tạm thời (trong RAM)
-const orders = {};
+// ======================
+//       WEBHOOK
+// ======================
 
-// Tạo mã đơn
-function createOrderId() {
-  return "OD" + Math.floor(Math.random() * 1000000);
-}
+// Webhook Sepay (nhận thông báo thanh toán)
+app.post("/sepay", (req, res) => {
+  console.log("Webhook Sepay:", req.body);
+
+  let data = req.body;
+  let content = (data.content || data.description || "").trim().toUpperCase();
+  let amount = data.transferAmount || data.amount;
+
+  let orderId = Object.keys(orders).find(id => content.includes(id));
+  let order = orders[orderId];
+
+  if (order && !order.paid) {
+    if (order.amount == amount) {
+      order.paid = true;
+
+      // Chuẩn bị danh sách link đẹp
+      let bookLinksText = order.books
+        .map((b, index) => {
+          let linkParts = b.link.split(', ').map(part => part.trim());
+          
+          let linksDisplay = linkParts
+            .map((part, i) => {
+              if (part.includes('(Part')) {
+                return part;
+              } else if (linkParts.length > 1) {
+                return `Link part ${i + 1}: ${part}`;
+              } else {
+                return part;
+              }
+            })
+            .join("\n");
+
+          return `${index + 1}. ${b.name}\n${linksDisplay}`;
+        })
+        .join("\n\n");
+
+      bot.sendMessage(order.chatId,
+        `✅ **THANH TOÁN THÀNH CÔNG!**
+
+Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã được mở khóa.
+
+**Hướng dẫn đọc truyện trên điện thoại qua Link Google Docs:**
+https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing
+
+---------------------------
+
+**Danh sách truyện của bạn:**
+
+${bookLinksText}
+
+---------------------------
+
+📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, liên hệ admin @Falris_tn nhé!
+
+Chúc bạn đọc truyện vui vẻ! 🔥`,
+        { parse_mode: 'Markdown' }
+      );
+
+      // Xóa order sau khi xử lý xong
+      delete orders[orderId];
+    }
+  }
+
+  res.send("ok");
+});
+
+// Webhook Telegram
+app.post(`/bot${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+// Set webhook cho Telegram (chạy 1 lần khi server start)
+const url = "https://chatboxai-eoul.onrender.com";  // <-- thay bằng domain thật của Render nếu khác
+bot.setWebHook(`${url}/bot${token}`)
+  .then(() => console.log('Webhook Telegram đã được set thành công'))
+  .catch(err => console.error('Lỗi set webhook Telegram:', err));
+
+// ======================
+//       BOT LOGIC
+// ======================
 
 // START
 bot.onText(/\/start/, (msg) => {
@@ -104,7 +194,7 @@ bot.on("message", async (msg) => {
   let text = msg.text;
   if (!text) return;
 
-  // Bỏ qua nếu là lệnh (để tránh xử lý /list, /start làm tin nhắn chọn)
+  // Bỏ qua nếu là lệnh
   if (text.startsWith('/')) return;
 
   // Kiểm tra nhập số (ví dụ: 1 3 5)
@@ -179,84 +269,7 @@ Cảm ơn bạn đã ủng hộ! ❤️`,
   }
 });
 
-// Webhook Sepay
-app.post("/sepay", (req, res) => {
-  console.log("Webhook Sepay:", req.body);
-
-  let data = req.body;
-  let content = (data.content || data.description || "").trim().toUpperCase();
-  let amount = data.transferAmount || data.amount;
-
-  let orderId = Object.keys(orders).find(id => content.includes(id));
-  let order = orders[orderId];
-
-  if (order && !order.paid) {
-    if (order.amount == amount) {
-      order.paid = true;
-
-      // Chuẩn bị danh sách link đẹp
-      let bookLinksText = order.books
-        .map((b, index) => {
-          let linkParts = b.link.split(', ').map(part => part.trim());
-          
-          let linksDisplay = linkParts
-            .map((part, i) => {
-              if (part.includes('(Part')) {
-                return part;
-              } else if (linkParts.length > 1) {
-                return `Link part ${i + 1}: ${part}`;
-              } else {
-                return part;
-              }
-            })
-            .join("\n");
-
-          return `${index + 1}. ${b.name}\n${linksDisplay}`;
-        })
-        .join("\n\n");
-
-      bot.sendMessage(order.chatId,
-        `✅ **THANH TOÁN THÀNH CÔNG!**
-
-Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã được mở khóa.
-
-**Hướng dẫn đọc truyện trên điện thoại qua Link Google Docs:**
-https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing
-
----------------------------
-
-**Danh sách truyện của bạn:**
-
-${bookLinksText}
-
----------------------------
-
-📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, liên hệ admin @Falris_tn nhé!
-
-Chúc bạn đọc truyện vui vẻ! 🔥`,
-        { parse_mode: 'Markdown' }
-      );
-
-      // Optional: Xóa order sau khi gửi xong (tiết kiệm RAM)
-      delete orders[orderId];
-    }
-  }
-
-  res.send("ok");
-});
-
-// Express server cho webhook
-const app = express();
-app.use(bodyParser.json());
-
-app.post(`/bot${token}`, (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-
-const url = "https://chatboxai-eoul.onrender.com";
-bot.setWebHook(`${url}/bot${token}`);
-
+// Khởi động server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
