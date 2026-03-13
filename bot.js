@@ -1,10 +1,12 @@
 const TelegramBot = require('node-telegram-bot-api');
-const QRCode = require("qrcode");
+// const QRCode = require("qrcode");
 
 // TOKEN mới của bạn
 const token = process.env.BOT_TOKEN;
 
-const bot = new TelegramBot(token, { polling: true });
+const bot = new TelegramBot(token);
+
+
 
 // danh sách truyện
 const books = require("./books");
@@ -146,6 +148,11 @@ const bodyParser = require("body-parser");
 const app = express();
 app.use(bodyParser.json());
 
+app.post(`/bot${token}`, (req, res) => {
+ bot.processUpdate(req.body);
+ res.sendStatus(200);
+});
+
 
 
 
@@ -188,6 +195,10 @@ res.send("ok");
 
 });
 
+const url = "https://chatboxai-eoul.onrender.com";
+
+bot.setWebHook(`${url}/bot${token}`);
+
 
 
 
@@ -196,3 +207,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=>{
  console.log("Server running");
 });
+
