@@ -128,6 +128,7 @@ Chúc bạn đọc truyện vui vẻ! 🔥`,
 
 // Webhook Telegram
 app.post(`/bot${token}`, (req, res) => {
+  console.log('📥 Nhận update từ Telegram:', JSON.stringify(req.body, null, 2));  // <--- Thêm dòng này
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
@@ -162,7 +163,7 @@ bot.onText(/\/list/, async (msg) => {
   const books = await getBooks();
 
   if (books.length === 0) {
-    return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @Falris_tn để kiểm tra nhé!');
+    return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!');
   }
 
   let text = "📚 Danh sách truyện:\n\n";
