@@ -162,42 +162,62 @@ Nhấn /list để xem danh sách truyện`);
 
 // LIST TRUYỆN
 bot.onText(/\/list/, async (msg) => {
+  console.log("Hàm getBooks đã được gọi");
 
-console.log("Hàm getBooks đã được gọi");  // <--- Thêm dòng này để kiểm tra hàm getBooks có được gọi không
+  try {
+    const books = await getBooks();
 
-  const books = await getBooks();
-
-  // if (books.length === 0) {
-  //   return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!');
-  // }
-
-  let text = "📚 Danh sách truyện:\n\n";
-
-  // books.forEach(b => {
-  //   text += b.id;
-  // });
-
-  books.forEach(b => {
-    text += `-----------------------------\n\n`;
-
-
-    if (b.free) {
-      text += `${b.id}. ${b.name}\n`;
-    } else {
-      text += `${b.id}. ${b.name}\n`;
+    if (books.length === 0) {
+      return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @Falris_tn để kiểm tra nhé!');
     }
-    
-    text += `   📖 Số chương: ${b.chapters}\n`
-    text += `   📏 Độ dài: ${b.chapterLength}\n`;
-    text += `   🎭 Thể loại: ${b.genres}\n`;
-    text += `   📝 Nội dung: ${b.description}\n\n`;
-    text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n`;
-  });
 
-  text += `\n✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
-  text += `Ví dụ: 1 2 4\n`;
+    const ITEMS_PER_MESSAGE = 5;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
+    const totalMessages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
 
-  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+    for (let i = 0; i < books.length; i += ITEMS_PER_MESSAGE) {
+      const chunk = books.slice(i, i + ITEMS_PER_MESSAGE);
+      const partNumber = Math.floor(i / ITEMS_PER_MESSAGE) + 1;
+
+      let text = `📚 Danh sách truyện (Phần ${partNumber}/${totalMessages})\n\n`;
+
+      chunk.forEach(b => {
+        text += `-----------------------------\n\n`;
+
+        if (b.free) {
+          text += `${b.id}*. ${b.name}\n`;
+        } else {
+          text += `${b.id}. ${b.name}\n`;
+        }
+
+        text += `   📖 Số chương: ${b.chapters}\n`;
+        text += `   📏 Độ dài: ${b.chapterLength}\n`;
+        text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+        text += `   📝 Nội dung: ${b.description}\n`;
+        text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
+      });
+
+      // Nếu không phải phần cuối, thêm lời nhắc
+      if (partNumber < totalMessages) {
+        text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
+      }
+
+      text += `\n✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
+      text += `Ví dụ: 1 3 5\n`;
+
+      await bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+
+      // Delay nhẹ giữa các tin nhắn để tránh flood (Telegram giới hạn ~30 msg/giây nhưng an toàn hơn)
+      if (partNumber < totalMessages) {
+        await new Promise(resolve => setTimeout(resolve, 800)); // 0.8 giây
+      }
+    }
+
+    console.log(`Đã gửi ${totalMessages} tin nhắn danh sách truyện cho user ${msg.chat.id}`);
+
+  } catch (err) {
+    console.error("Lỗi khi gửi /list:", err.message || err);
+    await bot.sendMessage(msg.chat.id, 'Có lỗi khi tải danh sách truyện 😵. Thử lại sau hoặc liên hệ @Falris_tn nhé!');
+  }
 });
 
 // XỬ LÝ CHỌN TRUYỆN
