@@ -163,7 +163,8 @@ Nhấn /list để xem danh sách truyện`);
 bot.onText(/\/list/, async (msg) => {
 
 const books = await getBooks();
-console.log(books);  // <--- Thêm dòng này để kiểm tra hàm getBooks có được định nghĩa không
+console.log("Hàm getBooks đã được gọi");  // <--- Thêm dòng này để kiểm tra hàm getBooks có được gọi không
+console.log("books:", books);  // <--- Thêm dòng này để kiểm tra hàm getBooks có được định nghĩa không
 
   // const books = await getBooks();
 
