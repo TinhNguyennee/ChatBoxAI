@@ -162,9 +162,8 @@ Nhấn /list để xem danh sách truyện`);
 // LIST TRUYỆN
 bot.onText(/\/list/, async (msg) => {
 
-  getBooks().then(books => {
+const books = await getBooks();
 console.log(books);  // <--- Thêm dòng này để kiểm tra hàm getBooks có được định nghĩa không
-  });
 
   // const books = await getBooks();
 
