@@ -56,10 +56,6 @@ async function getBooks() {
   }
 }
 
-getBooks().then(books => {
-  console.log("Hàm getBooks đã được gọi");
-  console.log("books:", books);
-});
 
 
 
@@ -184,11 +180,18 @@ console.log("Hàm getBooks đã được gọi");  // <--- Thêm dòng này đ�
   books.forEach(b => {
     text += `-----------------------------\n`;
     
-    if (b.free) {
-      text += `${b.id}*. ${b.name}\n`;
-    } else {
-      text += `${b.id}. ${b.name}\n`;
-    }
+    text += `*${b.id}. ${b.name}* ${b.free ? " (Free)" : ""}\n`;
+    text += `   📖 Số chương: ${b.chapters}\n`
+    text += `   📏 Độ dài: ${b.chapterLength}\n`;
+    text += `   🎭 Thể loại: ${b.genres.join(', ')}\n`;
+    text += `   📝 Nội dung: ${b.description}\n\n`;
+    text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n`;
+    
+    // if (b.free) {
+    //   text += `${b.id}*. ${b.name}\n`;
+    // } else {
+    //   text += `${b.id}. ${b.name}\n`;
+    // }
     
     // text += `   📖 Số chương: ${b.chapters}\n`
     // text += `   📏 Độ dài: ${b.chapterLength}\n`;
