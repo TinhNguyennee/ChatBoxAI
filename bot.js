@@ -193,7 +193,7 @@ bot.onText(/\/list/, async (msg) => {
         text += `   📖 Số chương: ${b.chapters}\n`;
         text += `   📏 Độ dài: ${b.chapterLength}\n`;
         text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
-        text += `   📝 Nội dung: ${b.description}\n`;
+        // text += `   📝 Nội dung: ${b.description}\n`;
         text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
       });
 
