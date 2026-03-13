@@ -16,7 +16,7 @@ function getBooks(){
  return JSON.parse(data);
 }
 
-const books = getBooks();
+// const books = getBooks();
 
 // nơi lưu đơn hàng
 const orders = {};
@@ -30,7 +30,7 @@ function createOrderId(){
 bot.onText(/\/start/, (msg) => {
 
 bot.sendMessage(msg.chat.id,
-`🐸 Chào mừng đến với Truyện Ếch Xanh 🐸
+`🐸 Chào mừng đến với Truyện Ếch Xanh
 
 - Chat Box này dùng để xem list truyện, giá và mua truyện trực tiếp qua bot.
 
@@ -45,6 +45,9 @@ Nhấn /list để xem danh sách truyện`);
 
 // LIST TRUYỆN
 bot.onText(/\/list/, (msg) => {
+
+  const books = getBooks();
+
   let text = "📚 Danh sách truyện:\n\n";
 
   books.forEach(b => {
@@ -85,6 +88,8 @@ if(/^[0-9 ]+$/.test(text)){
 let ids = text.split(" ").map(Number);
 
 // truyện đã chọn
+  const books = getBooks();
+
 let selected = books.filter(b=>ids.includes(b.id));
 
 if(selected.length===0){
@@ -132,6 +137,7 @@ let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${
 
 // gửi QR
 bot.sendPhoto(msg.chat.id, qrLink, {
+  
   caption: `📦 **ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG!**
 
 Bạn đã chọn:
@@ -196,6 +202,7 @@ if(order && !order.paid){
 
 if (order.amount == amount) {
   order.paid = true;
+
 
   // Chuẩn bị danh sách link đẹp đẽ
   let bookLinksText = order.books
