@@ -16,7 +16,16 @@ function getBooks(){
  return JSON.parse(data);
 }
 
-  const books = getBooks();
+  const books2 = getBooks();
+  const books = books2.map((b, index) => ({
+    id: index + 1,
+    name: b.name,
+    chapters: b.chapters,
+    chapterLength: b.chapterLength,
+    description: b.description,
+    free: b.free,
+    price: b.price
+  }));
 
 // nơi lưu đơn hàng
 const orders = {};
@@ -47,8 +56,6 @@ Nhấn /list để xem danh sách truyện`);
 bot.onText(/\/list/, (msg) => {
 
   let text = "📚 Danh sách truyện:\n\n";
-
-  const books = getBooks();
 
   console.log("Books:", books);
 
