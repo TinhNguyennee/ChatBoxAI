@@ -73,23 +73,18 @@ app.post("/sepay", async (req, res) => {
 
   let orderId = Object.keys(orders).find(id => content.includes(id));
   if (!orderId) {
-    console.log("Không tìm thấy orderId trong content:", content);
+    console.log("Không tìm thấy orderId:", content);
     return res.send("ok");
   }
 
   let order = orders[orderId];
-  if (!order) {
-    console.log("Order không tồn tại trong RAM:", orderId);
-    return res.send("ok");
-  }
-
-  if (order.paid) {
-    console.log("Order đã paid trước đó:", orderId);
+  if (!order || order.paid) {
+    console.log("Order không tồn tại hoặc đã paid:", orderId);
     return res.send("ok");
   }
 
   if (order.amount !== amount) {
-    console.log(`Số tiền không khớp - nhận ${amount}, cần ${order.amount}`);
+    console.log(`Số tiền không khớp: nhận ${amount}, cần ${order.amount}`);
     return res.send("ok");
   }
 
@@ -97,20 +92,18 @@ app.post("/sepay", async (req, res) => {
   console.log(`✅ Thanh toán OK đơn ${orderId} - ${order.books.length} bộ`);
 
   try {
-    const ITEMS_PER_SUCCESS_MSG = 3;
+    const ITEMS_PER_SUCCESS_MSG = 3;           // Đồng bộ với phần tạo đơn
     const totalParts = Math.ceil(order.books.length / ITEMS_PER_SUCCESS_MSG);
 
     for (let i = 0; i < order.books.length; i += ITEMS_PER_SUCCESS_MSG) {
       const chunk = order.books.slice(i, i + ITEMS_PER_SUCCESS_MSG);
       const partNumber = Math.floor(i / ITEMS_PER_SUCCESS_MSG) + 1;
 
-      // Build link an toàn hơn, tránh crash nếu link null
+      // Build link siêu an toàn
       const chunkLinks = chunk
         .map((b, idx) => {
           let linkStr = (b.link || '').trim();
-          if (!linkStr) {
-            return `${i + idx + 1}. ${b.name}\n(LINK KHÔNG CÓ)`;
-          }
+          if (!linkStr) return `${i + idx + 1}. ${b.name}\n(LINK KHÔNG CÓ)`;
           let linkParts = linkStr.split(', ').map(p => p.trim());
           let linksDisplay = linkParts
             .map((part, j) => {
@@ -127,33 +120,34 @@ app.post("/sepay", async (req, res) => {
         ? `✅ THANH TOÁN THÀNH CÔNG!\n\n`
         : `✅ Tiếp tục danh sách (Phần ${partNumber}/${totalParts})\n\n`;
 
-      successText += `Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã mở khóa.\n\n`;
-
+      successText += `Cảm ơn bạn đã ủng hộ! Truyện đã mở khóa.\n\n`;
       successText += `Hướng dẫn đọc trên điện thoại:\n`;
       successText += `https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing\n\n`;
-
       successText += `Truyện của bạn:\n${chunkLinks}\n\n`;
 
       if (partNumber < totalParts) {
         successText += `(Còn phần sau...)\n\n`;
       } else {
-        successText += `📌 Mẹo: Dùng app Google Docs để đọc mượt. Có vấn đề gì nhắn @ea7bpp nhé!\n`;
+        successText += `Mẹo: Dùng app Google Docs để đọc mượt. Có vấn đề gì nhắn @ea7bpp nhé!\n`;
         successText += `Chúc đọc vui! 🔥`;
       }
 
-      // Gửi và log
-      await bot.sendMessage(order.chatId, successText, { parse_mode: 'Markdown' });
-      console.log(`Gửi thành công phần ${partNumber}/${totalParts} cho đơn ${orderId}`);
+      // GỬI PLAIN TEXT (tắt Markdown hoàn toàn để tránh lỗi)
+      await bot.sendMessage(order.chatId, successText);
+      console.log(`Gửi thành công phần ${partNumber}/${totalParts} (plain text) cho đơn ${orderId}`);
 
-      if (partNumber < totalParts) await new Promise(r => setTimeout(r, 1200));
+      if (partNumber < totalParts) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
     }
 
-    console.log(`Hoàn tất gửi link đơn ${orderId}`);
+    console.log(`Hoàn tất gửi link đơn ${orderId} (${totalParts} phần)`);
 
   } catch (err) {
     console.error(`LỖI GỬI LINK ĐƠN ${orderId}:`, err.message || err.stack);
-    // Fallback: gửi tin nhắn lỗi cho user (tùy chọn)
-    await bot.sendMessage(order.chatId, '✅ Thanh toán OK nhưng có lỗi khi gửi link. Nhắn @ea7bpp kèm mã đơn ' + orderId + ' để hỗ trợ nhé!', { parse_mode: 'Markdown' });
+    await bot.sendMessage(order.chatId, 
+      `✅ Thanh toán OK nhưng lỗi gửi link.\n` +
+      `Nhắn @ea7bpp kèm mã đơn ${orderId} để hỗ trợ ngay nhé!`);
   }
 
   delete orders[orderId];
