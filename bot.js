@@ -56,6 +56,11 @@ async function getBooks() {
   }
 }
 
+getBooks().then(books => {
+  console.log("Hàm getBooks đã được gọi");
+  console.log("books:", books);
+});
+
 
 
 // ======================
@@ -163,6 +168,7 @@ Nhấn /list để xem danh sách truyện`);
 bot.onText(/\/list/, async (msg) => {
 
 const books = await getBooks();
+await
 console.log("Hàm getBooks đã được gọi");  // <--- Thêm dòng này để kiểm tra hàm getBooks có được gọi không
 console.log("books:", books);  // <--- Thêm dòng này để kiểm tra hàm getBooks có được định nghĩa không
 
