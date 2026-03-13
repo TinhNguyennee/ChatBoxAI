@@ -183,33 +183,32 @@ bot.onText(/\/list/, async (msg) => {
       chunk.forEach(b => {
         text += `-----------------------------\n\n`;
 
-        // if (b.free) {
-        //   text += `${b.id}. ${b.name}\n`;
-        // } else {
-        //   text += `${b.id}. ${b.name}\n`;
-        // }
-        
-        text += `${b.id}. ${b.name}\n`;
+        if (b.free) {
+          text += `${b.id}*. ${b.name}\n`;
+        } else {
+          text += `${b.id}. ${b.name}\n`;
+        }
+
         text += `   📖 Số chương: ${b.chapters}\n`;
         text += `   📏 Độ dài: ${b.chapterLength}\n`;
         text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
-        // text += `   📝 Nội dung: ${b.description}\n`;
+        text += `   📝 Nội dung: ${b.description}\n`;
         text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
       });
 
       // Nếu không phải phần cuối, thêm lời nhắc
-      if (partNumber = totalMessages) {
-        // text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
-        text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
-        text += `Ví dụ: 1 3 5\n`;
+      if (partNumber < totalMessages) {
+        text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
       }
 
+      text += `\n✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
+      text += `Ví dụ: 1 3 5\n`;
 
       await bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 
       // Delay nhẹ giữa các tin nhắn để tránh flood (Telegram giới hạn ~30 msg/giây nhưng an toàn hơn)
       if (partNumber < totalMessages) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 giây
+        await new Promise(resolve => setTimeout(resolve, 800)); // 0.8 giây
       }
     }
 
@@ -288,6 +287,12 @@ ${selected.map(b => `• ${b.name}`).join("\n")}
 📝 **Nội dung chuyển khoản chính xác:**  
 \`${content}\`
 
+🔗 **Quét mã QR bên trên** hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank) nội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng.
+
+⏳ Sau khi nhận được thanh toán, bot sẽ **tự động gửi link truyện** cho bạn ngay lập tức.
+
+⚠️ **Lưu ý quan trọng:**  
+Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng liên hệ ngay admin qua @Falris_tn hoặc gửi tin nhắn chứa mã đơn hàng ${orderId} để được hỗ trợ nhanh chóng nhé!
 
 Cảm ơn bạn đã ủng hộ! ❤️`,
       parse_mode: 'Markdown'
