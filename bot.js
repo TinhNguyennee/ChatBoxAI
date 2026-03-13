@@ -92,18 +92,18 @@ app.post("/sepay", async (req, res) => {
   console.log(`✅ Thanh toán OK đơn ${orderId} - ${order.books.length} bộ`);
 
   try {
-    const ITEMS_PER_SUCCESS_MSG = 3;           // Đồng bộ với phần tạo đơn
+    const ITEMS_PER_SUCCESS_MSG = 3;
     const totalParts = Math.ceil(order.books.length / ITEMS_PER_SUCCESS_MSG);
 
     for (let i = 0; i < order.books.length; i += ITEMS_PER_SUCCESS_MSG) {
       const chunk = order.books.slice(i, i + ITEMS_PER_SUCCESS_MSG);
       const partNumber = Math.floor(i / ITEMS_PER_SUCCESS_MSG) + 1;
 
-      // Build link siêu an toàn
+      // Build link dùng id thật của truyện
       const chunkLinks = chunk
-        .map((b, idx) => {
+        .map((b) => {
           let linkStr = (b.link || '').trim();
-          if (!linkStr) return `${i + idx + 1}. ${b.name}\n(LINK KHÔNG CÓ)`;
+          if (!linkStr) return `${b.id}. ${b.name}\n(LINK KHÔNG CÓ)`;
           let linkParts = linkStr.split(', ').map(p => p.trim());
           let linksDisplay = linkParts
             .map((part, j) => {
@@ -112,18 +112,23 @@ app.post("/sepay", async (req, res) => {
               return part;
             })
             .join("\n");
-          return `${i + idx + 1}. ${b.name}\n${linksDisplay}`;
+          return `${b.id}. ${b.name}\n${linksDisplay}`;
         })
         .join("\n\n");
 
-      let successText = partNumber === 1
-        ? `✅ THANH TOÁN THÀNH CÔNG!\n\n`
-        : `✅ Tiếp tục danh sách (Phần ${partNumber}/${totalParts})\n\n`;
+      let successText = "";
 
-      successText += `Cảm ơn bạn đã ủng hộ! Truyện đã mở khóa.\n\n`;
-      successText += `Hướng dẫn đọc trên điện thoại:\n`;
-      successText += `https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing\n\n`;
-      successText += `Truyện của bạn:\n${chunkLinks}\n\n`;
+      // Phần đầu tiên (phần 1) mới có hướng dẫn + cảm ơn
+      if (partNumber === 1) {
+        successText += `✅ THANH TOÁN THÀNH CÔNG!\n\n`;
+        successText += `Cảm ơn bạn đã ủng hộ! Truyện đã mở khóa.\n\n`;
+        successText += `Hướng dẫn đọc trên điện thoại:\n`;
+        successText += `https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing\n\n`;
+        successText += `Truyện của bạn:\n${chunkLinks}\n\n`;
+      } else {
+        successText += `✅ Tiếp tục danh sách (Phần ${partNumber}/${totalParts})\n\n`;
+        successText += `Truyện của bạn:\n${chunkLinks}\n\n`;
+      }
 
       if (partNumber < totalParts) {
         successText += `(Còn phần sau...)\n\n`;
@@ -132,7 +137,7 @@ app.post("/sepay", async (req, res) => {
         successText += `Chúc đọc vui! 🔥`;
       }
 
-      // GỬI PLAIN TEXT (tắt Markdown hoàn toàn để tránh lỗi)
+      // Gửi plain text (không preview link)
       await bot.sendMessage(order.chatId, successText);
       console.log(`Gửi thành công phần ${partNumber}/${totalParts} (plain text) cho đơn ${orderId}`);
 
