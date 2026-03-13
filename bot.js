@@ -37,6 +37,7 @@ function createOrderId(){
 
 // START
 bot.onText(/\/start/, (msg) => {
+  const books2 = getBooks();
 
 bot.sendMessage(msg.chat.id,
 `🐸 Chào mừng đến với Truyện Ếch Xanh
