@@ -208,7 +208,7 @@ bot.onText(/\/list/, async (msg) => {
 
       // Delay nhẹ giữa các tin nhắn để tránh flood (Telegram giới hạn ~30 msg/giây nhưng an toàn hơn)
       if (partNumber < totalMessages) {
-        await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 giây
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1.5 giây
       }
     }
 
@@ -216,7 +216,7 @@ bot.onText(/\/list/, async (msg) => {
 
   } catch (err) {
     console.error("Lỗi khi gửi /list:", err.message || err);
-    await bot.sendMessage(msg.chat.id, 'Có lỗi khi tải danh sách truyện 😵. Thử lại sau hoặc liên hệ @Falris_tn nhé!');
+    await bot.sendMessage(msg.chat.id, 'Có lỗi khi tải danh sách truyện 😵. Thử lại sau hoặc liên hệ @ea7bpp nhé!');
   }
 });
 
@@ -287,12 +287,6 @@ ${selected.map(b => `• ${b.name}`).join("\n")}
 📝 **Nội dung chuyển khoản chính xác:**  
 \`${content}\`
 
-🔗 **Quét mã QR bên trên** hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank) nội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng.
-
-⏳ Sau khi nhận được thanh toán, bot sẽ **tự động gửi link truyện** cho bạn ngay lập tức.
-
-⚠️ **Lưu ý quan trọng:**  
-Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng liên hệ ngay admin qua @Falris_tn hoặc gửi tin nhắn chứa mã đơn hàng ${orderId} để được hỗ trợ nhanh chóng nhé!
 
 Cảm ơn bạn đã ủng hộ! ❤️`,
       parse_mode: 'Markdown'
