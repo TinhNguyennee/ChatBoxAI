@@ -55,8 +55,10 @@ async function getBooks() {
     return [];  // trả về mảng rỗng nếu lỗi
   }
 }
-  const books = await getBooks();
-console.log(books);  // <--- Thêm dòng này để kiểm tra hàm getBooks có được định nghĩa không
+
+getBooks().then(books => {
+  console.log(books);  // Test hàm lấy sách (sẽ in ra danh sách sách hoặc mảng rỗng nếu lỗi)
+});
 
 // ======================
 //       WEBHOOK
