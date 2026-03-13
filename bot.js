@@ -162,9 +162,9 @@ Nhấn /list để xem danh sách truyện`);
 // LIST TRUYỆN
 bot.onText(/\/list/, (msg) => {
 
-  getBooks().then(books => {
-    console.log(books);
-  });
+  // getBooks().then(books => {
+  //   console.log(books);
+  // });
   // const books = await getBooks();
 
   // if (books.length === 0) {
@@ -192,7 +192,7 @@ bot.onText(/\/list/, (msg) => {
   text += `\n✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
   text += `Ví dụ: 1 2 4\n`;
 
-  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+  bot.sendMessage(msg.chat.id, "hello" + text, { parse_mode: 'Markdown' });
 });
 
 // XỬ LÝ CHỌN TRUYỆN
