@@ -55,6 +55,8 @@ async function getBooks() {
     return [];  // trả về mảng rỗng nếu lỗi
   }
 }
+  const books = await getBooks();
+console.log(books);  // <--- Thêm dòng này để kiểm tra hàm getBooks có được định nghĩa không
 
 // ======================
 //       WEBHOOK
@@ -128,7 +130,6 @@ Chúc bạn đọc truyện vui vẻ! 🔥`,
 
 // Webhook Telegram
 app.post(`/bot${token}`, (req, res) => {
-  console.log('📥 Nhận update từ Telegram:', JSON.stringify(req.body, null, 2));  // <--- Thêm dòng này
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
