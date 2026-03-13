@@ -16,7 +16,8 @@ function getBooks(){
  return JSON.parse(data);
 }
 
-  // const books = getBooks();
+  const books = getBooks();
+  console.log("Loaded books:", books);
 
 // nơi lưu đơn hàng
 const orders = {};
