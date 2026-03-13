@@ -160,11 +160,11 @@ Nhấn /list để xem danh sách truyện`);
 });
 
 // LIST TRUYỆN
-bot.onText(/\/list/, async (msg) => {
+bot.onText(/\/list/, (msg) => {
 
-  // getBooks().then(books => {
-  //   console.log(books);
-  // });
+  getBooks().then(books => {
+    console.log(books);
+  });
   // const books = await getBooks();
 
   // if (books.length === 0) {
