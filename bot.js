@@ -180,7 +180,7 @@ console.log("Hàm getBooks đã được gọi");  // <--- Thêm dòng này đ�
   books.forEach(b => {
     text += `-----------------------------\n`;
 
- text += `${b.id}`;
+ text += `${b.name}`;
     // if (b.free) {
     //   text += `${b.id}*. ${b.name}\n`;
     // } else {
