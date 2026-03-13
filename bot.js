@@ -16,7 +16,7 @@ function getBooks(){
  return JSON.parse(data);
 }
 
-// const books = getBooks();
+console.log(getBooks());
 
 // nơi lưu đơn hàng
 const orders = {};
@@ -47,6 +47,7 @@ Nhấn /list để xem danh sách truyện`);
 bot.onText(/\/list/, (msg) => {
 
   const books = getBooks();
+  console.log("BOOKS:",books);
 
   let text = "📚 Danh sách truyện:\n\n";
 
