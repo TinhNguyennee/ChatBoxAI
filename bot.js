@@ -9,7 +9,14 @@ const bot = new TelegramBot(token);
 
 
 // danh sách truyện
-const books = require("./books");
+const fs = require("fs");
+
+function getBooks(){
+ const data = fs.readFileSync("./books.json","utf8");
+ return JSON.parse(data);
+}
+
+const books = getBooks();
 
 // nơi lưu đơn hàng
 const orders = {};
