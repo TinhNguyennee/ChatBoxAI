@@ -78,31 +78,17 @@ app.post("/sepay", async (req, res) => {
     if (order.amount == amount) {
       order.paid = true;
 
-      try {
-        // Chuẩn bị link (giữ nguyên cách hiển thị cũ của bạn)
-        let bookLinksText = order.books
-          .map((b, index) => {
-            let linkParts = b.link.split(', ').map(part => part.trim());
-            let linksDisplay = linkParts
-              .map((part, i) => {
-                if (part.includes('(Part')) return part;
-                else if (linkParts.length > 1) return `Link part ${i + 1}: ${part}`;
-                else return part;
-              })
-              .join("\n");
-            return `${index + 1}. ${b.name}\n${linksDisplay}`;
-          })
-          .join("\n\n");
+      console.log(`✅ Thanh toán thành công đơn ${orderId} - ${order.books.length} bộ truyện`);
 
-        // ===== TÁCH TIN NHẮN THÀNH CÔNG (giống như bạn đã tách đơn hàng) =====
-        const ITEMS_PER_SUCCESS_MSG = 3;  // Mỗi tin nhắn tối đa 4 bộ (an toàn nhất)
-        const totalSuccessParts = Math.ceil(order.books.length / ITEMS_PER_SUCCESS_MSG);
+      try {
+        const ITEMS_PER_SUCCESS_MSG = 3;   // Đồng bộ với phần chọn truyện
+        const totalParts = Math.ceil(order.books.length / ITEMS_PER_SUCCESS_MSG);
 
         for (let i = 0; i < order.books.length; i += ITEMS_PER_SUCCESS_MSG) {
           const chunk = order.books.slice(i, i + ITEMS_PER_SUCCESS_MSG);
           const partNumber = Math.floor(i / ITEMS_PER_SUCCESS_MSG) + 1;
 
-          // Lấy phần link của chunk này
+          // Xây dựng link cho phần này
           const chunkLinks = chunk
             .map((b, idx) => {
               let linkParts = b.link.split(', ').map(part => part.trim());
@@ -117,7 +103,10 @@ app.post("/sepay", async (req, res) => {
             })
             .join("\n\n");
 
-          let successText = `✅ **THANH TOÁN THÀNH CÔNG!** (Phần ${partNumber}/${totalSuccessParts})\n\n`;
+          let successText = partNumber === 1
+            ? `✅ **THANH TOÁN THÀNH CÔNG!**\n\n`
+            : `✅ **Tiếp tục danh sách truyện đã mở khóa** (Phần ${partNumber}/${totalParts})\n\n`;
+
           successText += `Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã được mở khóa.\n\n`;
 
           successText += `**Hướng dẫn đọc truyện trên điện thoại qua Link Google Docs:**\n`;
@@ -125,29 +114,30 @@ app.post("/sepay", async (req, res) => {
 
           successText += `**Danh sách truyện của bạn:**\n${chunkLinks}\n\n`;
 
-          if (partNumber < totalSuccessParts) {
+          if (partNumber < totalParts) {
             successText += `(Còn tiếp tục ở phần sau...)\n\n`;
           } else {
             successText += `📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, nhắn tin cho @ea7bpp nhé!\n\n`;
             successText += `Chúc bạn đọc truyện vui vẻ! 🔥`;
           }
 
+          // Gửi và log rõ ràng
           await bot.sendMessage(order.chatId, successText, { parse_mode: 'Markdown' });
+          console.log(`📤 Đã gửi phần ${partNumber}/${totalParts} link cho đơn ${orderId}`);
 
-          // Delay giữa các tin nhắn
-          if (partNumber < totalSuccessParts) {
-            await new Promise(resolve => setTimeout(resolve, 800));
+          // Delay giữa các phần
+          if (partNumber < totalParts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
 
-        console.log(`Đã gửi ${totalSuccessParts} tin nhắn link cho đơn ${orderId}`);
+        console.log(`🎉 Hoàn tất gửi link cho đơn ${orderId} (${totalParts} phần)`);
 
       } catch (err) {
-        console.error("❌ Lỗi khi gửi link thành công:", err.message || err);
-        // Vẫn xóa order để tránh lặp webhook
+        console.error(`❌ Lỗi gửi link đơn ${orderId}:`, err.message || err.stack);
       }
 
-      // Xóa order sau khi xử lý xong
+      // Xóa order
       delete orders[orderId];
     }
   }
