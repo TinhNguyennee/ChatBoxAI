@@ -65,83 +65,98 @@ async function getBooks() {
 
 // Webhook Sepay (nhận thông báo thanh toán)
 app.post("/sepay", async (req, res) => {
-  console.log("Webhook Sepay:", req.body);
+  console.log("Webhook Sepay nhận:", JSON.stringify(req.body, null, 2));
 
   let data = req.body;
   let content = (data.content || data.description || "").trim().toUpperCase();
   let amount = data.transferAmount || data.amount;
 
   let orderId = Object.keys(orders).find(id => content.includes(id));
-  let order = orders[orderId];
-
-  if (order && !order.paid) {
-    if (order.amount == amount) {
-      order.paid = true;
-
-      console.log(`✅ Thanh toán thành công đơn ${orderId} - ${order.books.length} bộ truyện`);
-
-      try {
-        const ITEMS_PER_SUCCESS_MSG = 3;   // Đồng bộ với phần chọn truyện
-        const totalParts = Math.ceil(order.books.length / ITEMS_PER_SUCCESS_MSG);
-
-        for (let i = 0; i < order.books.length; i += ITEMS_PER_SUCCESS_MSG) {
-          const chunk = order.books.slice(i, i + ITEMS_PER_SUCCESS_MSG);
-          const partNumber = Math.floor(i / ITEMS_PER_SUCCESS_MSG) + 1;
-
-          // Xây dựng link cho phần này
-          const chunkLinks = chunk
-            .map((b, idx) => {
-              let linkParts = b.link.split(', ').map(part => part.trim());
-              let linksDisplay = linkParts
-                .map((part, j) => {
-                  if (part.includes('(Part')) return part;
-                  else if (linkParts.length > 1) return `Link part ${j + 1}: ${part}`;
-                  else return part;
-                })
-                .join("\n");
-              return `${i + idx + 1}. ${b.name}\n${linksDisplay}`;
-            })
-            .join("\n\n");
-
-          let successText = partNumber === 1
-            ? `✅ **THANH TOÁN THÀNH CÔNG!**\n\n`
-            : `✅ **Tiếp tục danh sách truyện đã mở khóa** (Phần ${partNumber}/${totalParts})\n\n`;
-
-          successText += `Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã được mở khóa.\n\n`;
-
-          successText += `**Hướng dẫn đọc truyện trên điện thoại qua Link Google Docs:**\n`;
-          successText += `https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing\n\n`;
-
-          successText += `**Danh sách truyện của bạn:**\n${chunkLinks}\n\n`;
-
-          if (partNumber < totalParts) {
-            successText += `(Còn tiếp tục ở phần sau...)\n\n`;
-          } else {
-            successText += `📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, nhắn tin cho @ea7bpp nhé!\n\n`;
-            successText += `Chúc bạn đọc truyện vui vẻ! 🔥`;
-          }
-
-          // Gửi và log rõ ràng
-          await bot.sendMessage(order.chatId, successText, { parse_mode: 'Markdown' });
-          console.log(`📤 Đã gửi phần ${partNumber}/${totalParts} link cho đơn ${orderId}`);
-
-          // Delay giữa các phần
-          if (partNumber < totalParts) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-
-        console.log(`🎉 Hoàn tất gửi link cho đơn ${orderId} (${totalParts} phần)`);
-
-      } catch (err) {
-        console.error(`❌ Lỗi gửi link đơn ${orderId}:`, err.message || err.stack);
-      }
-
-      // Xóa order
-      delete orders[orderId];
-    }
+  if (!orderId) {
+    console.log("Không tìm thấy orderId trong content:", content);
+    return res.send("ok");
   }
 
+  let order = orders[orderId];
+  if (!order) {
+    console.log("Order không tồn tại trong RAM:", orderId);
+    return res.send("ok");
+  }
+
+  if (order.paid) {
+    console.log("Order đã paid trước đó:", orderId);
+    return res.send("ok");
+  }
+
+  if (order.amount !== amount) {
+    console.log(`Số tiền không khớp - nhận ${amount}, cần ${order.amount}`);
+    return res.send("ok");
+  }
+
+  order.paid = true;
+  console.log(`✅ Thanh toán OK đơn ${orderId} - ${order.books.length} bộ`);
+
+  try {
+    const ITEMS_PER_SUCCESS_MSG = 3;
+    const totalParts = Math.ceil(order.books.length / ITEMS_PER_SUCCESS_MSG);
+
+    for (let i = 0; i < order.books.length; i += ITEMS_PER_SUCCESS_MSG) {
+      const chunk = order.books.slice(i, i + ITEMS_PER_SUCCESS_MSG);
+      const partNumber = Math.floor(i / ITEMS_PER_SUCCESS_MSG) + 1;
+
+      // Build link an toàn hơn, tránh crash nếu link null
+      const chunkLinks = chunk
+        .map((b, idx) => {
+          let linkStr = (b.link || '').trim();
+          if (!linkStr) {
+            return `${i + idx + 1}. ${b.name}\n(LINK KHÔNG CÓ)`;
+          }
+          let linkParts = linkStr.split(', ').map(p => p.trim());
+          let linksDisplay = linkParts
+            .map((part, j) => {
+              if (part.includes('(Part')) return part;
+              if (linkParts.length > 1) return `Link part ${j + 1}: ${part}`;
+              return part;
+            })
+            .join("\n");
+          return `${i + idx + 1}. ${b.name}\n${linksDisplay}`;
+        })
+        .join("\n\n");
+
+      let successText = partNumber === 1
+        ? `✅ **THANH TOÁN THÀNH CÔNG!**\n\n`
+        : `✅ **Tiếp tục danh sách** (Phần ${partNumber}/${totalParts})\n\n`;
+
+      successText += `Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã mở khóa.\n\n`;
+
+      successText += `Hướng dẫn đọc trên điện thoại:\n`;
+      successText += `https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing\n\n`;
+
+      successText += `**Truyện của bạn:**\n${chunkLinks}\n\n`;
+
+      if (partNumber < totalParts) {
+        successText += `(Còn phần sau...)\n\n`;
+      } else {
+        successText += `📌 Mẹo: Dùng app Google Docs để đọc mượt. Có vấn đề gì nhắn @ea7bpp nhé!\n`;
+        successText += `Chúc đọc vui! 🔥`;
+      }
+
+      // Gửi và log
+      await bot.sendMessage(order.chatId, successText, { parse_mode: 'Markdown' });
+      console.log(`Gửi thành công phần ${partNumber}/${totalParts} cho đơn ${orderId}`);
+
+      if (partNumber < totalParts) await new Promise(r => setTimeout(r, 1200));
+    }
+
+    console.log(`Hoàn tất gửi link đơn ${orderId}`);
+
+  } catch (err) {
+    console.error(`LỖI GỬI LINK ĐƠN ${orderId}:`, err.message || err.stack);
+    // Fallback: gửi tin nhắn lỗi cho user (tùy chọn)
+    await bot.sendMessage(order.chatId, '✅ Thanh toán OK nhưng có lỗi khi gửi link. Nhắn @ea7bpp kèm mã đơn ' + orderId + ' để hỗ trợ nhé!', { parse_mode: 'Markdown' });
+  }
+
+  delete orders[orderId];
   res.send("ok");
 });
 
@@ -309,7 +324,7 @@ while (startIndex < selected.length) {
 
   // Chỉ hiển thị tổng tiền + thanh toán ở phần CUỐI CÙNG
   if (endIndex === selected.length) {
-    captionPart += `💰 Tổng tiền gốc: ${total.toLocaleString('vi-VN')}đ\n`;
+    captionPart += `\n💰 Tổng tiền gốc: ${total.toLocaleString('vi-VN')}đ\n`;
     captionPart += `🎁 Giảm giá: ${discount.toLocaleString('vi-VN')}đ\n`;
     captionPart += `💳 Số tiền cần thanh toán: ${final.toLocaleString('vi-VN')}đ\n\n`;
 
