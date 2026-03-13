@@ -160,39 +160,37 @@ Nhấn /list để xem danh sách truyện`);
 });
 
 // LIST TRUYỆN
-bot.onText(/\/list/, (msg) => {
+bot.onText(/\/list/, async (msg) => {
 
-  // getBooks().then(books => {
-  //   console.log(books);
-  // });
-  // const books = await getBooks();
+  
+  const books = await getBooks();
 
-  // if (books.length === 0) {
-  //   return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!');
-  // }
+  if (books.length === 0) {
+    return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!');
+  }
 
-  // let text = "📚 Danh sách truyện:\n\n";
+  let text = "📚 Danh sách truyện:\n\n";
 
-  // books.forEach(b => {
-  //   text += `-----------------------------\n`;
+  books.forEach(b => {
+    text += `-----------------------------\n`;
     
-  //   if (b.free) {
-  //     text += `${b.id}*. ${b.name}\n`;
-  //   } else {
-  //     text += `${b.id}. ${b.name}\n`;
-  //   }
+    if (b.free) {
+      text += `${b.id}*. ${b.name}\n`;
+    } else {
+      text += `${b.id}. ${b.name}\n`;
+    }
     
-  //   text += `   📖 Số chương: ${b.chapters}\n`;
-  //   text += `   📏 Độ dài: ${b.chapterLength}\n`;
-  //   text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
-  //   text += `   📝 Nội dung: ${b.description}\n\n`;
-  //   text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n`;
-  // });
+    text += `   📖 Số chương: ${b.chapters}\n`;
+    text += `   📏 Độ dài: ${b.chapterLength}\n`;
+    text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+    text += `   📝 Nội dung: ${b.description}\n\n`;
+    text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n`;
+  });
 
   text += `\n✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
   text += `Ví dụ: 1 2 4\n`;
 
-  bot.sendMessage(msg.chat.id, "hello" + text, { parse_mode: 'Markdown' });
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 });
 
 // XỬ LÝ CHỌN TRUYỆN
