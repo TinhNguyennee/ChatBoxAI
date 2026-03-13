@@ -16,7 +16,7 @@ function getBooks(){
  return JSON.parse(data);
 }
 
-console.log(getBooks());
+  // const books = getBooks();
 
 // nơi lưu đơn hàng
 const orders = {};
@@ -72,8 +72,7 @@ bot.onText(/\/list/, (msg) => {
   text += `✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
   text += `Ví dụ: 1 2 4\n\n`;
 
-  bot.sendMessage(msg.chat.id, text,
-  { parse_mode: 'Markdown' });
+  bot.sendMessage(msg.chat.id, text);
 });
 
 // KHI KHÁCH CHỌN TRUYỆN
