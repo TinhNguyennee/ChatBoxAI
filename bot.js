@@ -208,7 +208,7 @@ bot.onText(/\/list/, async (msg) => {
 
       // Delay nhẹ giữa các tin nhắn để tránh flood (Telegram giới hạn ~30 msg/giây nhưng an toàn hơn)
       if (partNumber < totalMessages) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 giây
+        await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 giây
       }
     }
 
