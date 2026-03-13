@@ -65,13 +65,13 @@ bot.onText(/\/list/, (msg) => {
     // Thông tin chi tiết
     text += `   📖 Số chương: ${b.chapters}\n`;
     text += `   📏 Độ dài: ${b.chapterLength}\n`;
-    text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+    text += `   🎭 Thể loại: ${(b.genres || []).join(", ")}\n`;
     text += `   📝 Nội dung: ${b.description}\n\n`;
     text += `   💰 Giá: ${b.free ? "Free" : b.price + "đ"}\n`;
   });
 
   text += `✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
-  text += `Ví dụ: 1 2 4\n\n`;
+  text += `Ví dụ: 1 2 4\n`;
 
   bot.sendMessage(msg.chat.id, text);
 });
