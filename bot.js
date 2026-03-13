@@ -17,7 +17,6 @@ function getBooks(){
 }
 
   const books = getBooks();
-  console.log("Loaded books:", books);
 
 // nơi lưu đơn hàng
 const orders = {};
@@ -47,9 +46,6 @@ Nhấn /list để xem danh sách truyện`);
 // LIST TRUYỆN
 bot.onText(/\/list/, (msg) => {
 
-  const books = getBooks();
-  console.log("BOOKS:",books);
-
   let text = "📚 Danh sách truyện:\n\n";
 
   books.forEach(b => {
@@ -65,7 +61,7 @@ bot.onText(/\/list/, (msg) => {
     // Thông tin chi tiết
     text += `   📖 Số chương: ${b.chapters}\n`;
     text += `   📏 Độ dài: ${b.chapterLength}\n`;
-    text += `   🎭 Thể loại: ${(b.genres || []).join(", ")}\n`;
+    // text += `   🎭 Thể loại: ${(b.genres || []).join(", ")}\n`;
     text += `   📝 Nội dung: ${b.description}\n\n`;
     text += `   💰 Giá: ${b.free ? "Free" : b.price + "đ"}\n`;
   });
@@ -73,7 +69,7 @@ bot.onText(/\/list/, (msg) => {
   text += `✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
   text += `Ví dụ: 1 2 4\n`;
 
-  bot.sendMessage(msg.chat.id, text);
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 });
 
 // KHI KHÁCH CHỌN TRUYỆN
