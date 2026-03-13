@@ -280,7 +280,7 @@ bot.on("message", async (msg) => {
       const chunk = selected.slice(i, i + ITEMS_PER_CAPTION);
       const partNumber = Math.floor(i / ITEMS_PER_CAPTION) + 1;
 
-      let captionPart = `📦 **ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG!** (Phần ${partNumber}/${totalParts})\n\n`;
+      let captionPart = `📦 ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\n`;
 
       captionPart += `Bạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n\n`;
 
@@ -288,12 +288,12 @@ bot.on("message", async (msg) => {
         captionPart += `(Danh sách còn tiếp tục ở phần sau...)\n\n`;
       }
 
-      captionPart += `💰 **Tổng tiền gốc:** ${total.toLocaleString('vi-VN')}đ\n`;
-      captionPart += `🎁 **Giảm giá:** ${discount.toLocaleString('vi-VN')}đ\n`;
-      captionPart += `💳 **Số tiền cần thanh toán:** ${final.toLocaleString('vi-VN')}đ\n\n`;
+      captionPart += `💰 Tổng tiền gốc: ${total.toLocaleString('vi-VN')}đ\n`;
+      captionPart += `🎁 Giảm giá: ${discount.toLocaleString('vi-VN')}đ\n`;
+      captionPart += `💳 Số tiền cần thanh toán: ${final.toLocaleString('vi-VN')}đ\n\n`;
 
-      captionPart += `🧾 **Mã đơn hàng:** ${orderId}\n`;
-      captionPart += `📝 **Nội dung chuyển khoản chính xác:** \`${content}\`\n\n`;
+      captionPart += `🧾 Mã đơn hàng: ${orderId}\n`;
+      captionPart += `📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
 
       captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
@@ -309,13 +309,13 @@ bot.on("message", async (msg) => {
     }
 
     // Phần 2: Tin nhắn riêng về hướng dẫn chuyển khoản + lưu ý (gửi sau cùng)
-    let instructionText = `🔗 **Quét mã QR bên trên** hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\n`;
+    let instructionText = `🔗 Quét mã QR bên trên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\n`;
     instructionText += `Nội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n`;
 
-    instructionText += `⏳ Sau khi nhận được thanh toán, bot sẽ **tự động gửi link truyện** cho bạn ngay lập tức.\n\n`;
+    instructionText += `⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n`;
 
-    instructionText += `⚠️ **Lưu ý quan trọng:**\n`;
-    instructionText += `Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng **${orderId}** và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n\n`;
+    instructionText += `⚠️ Lưu ý quan trọng:\n`;
+    instructionText += `Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng ${orderId} và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n\n`;
 
     instructionText += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
