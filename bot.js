@@ -48,7 +48,9 @@ bot.onText(/\/list/, (msg) => {
 
   let text = "📚 Danh sách truyện:\n\n";
 
-  console.log("Books:", books[0].id);
+  const books = getBooks();
+
+  console.log("Books:", books);
 
   // books.forEach(b => {
   //   text += `-----------------------------\n`;
