@@ -115,7 +115,7 @@ ${bookLinksText}
 
 ---------------------------
 
-📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, liên hệ admin @ea7bpp nhé!
+📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, nhắn tin cho @ea7bpp nhé!
 
 Chúc bạn đọc truyện vui vẻ! 🔥`,
         { parse_mode: 'Markdown' }
@@ -273,7 +273,7 @@ bot.on("message", async (msg) => {
 let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
 
 // Chia danh sách thành các phần, mỗi phần tối đa 8 bộ
-const ITEMS_PER_PART = 8;
+const ITEMS_PER_PART = 3;
 const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
 
 let partNumber = 1;
@@ -283,7 +283,7 @@ while (startIndex < selected.length) {
   const endIndex = Math.min(startIndex + ITEMS_PER_PART, selected.length);
   const chunk = selected.slice(startIndex, endIndex);
 
-  let captionPart = `📦 ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\n`;
+  let captionPart = `🛒 GIỎ HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\n`;
 
   captionPart += `Bạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n\n`;
 
@@ -331,9 +331,9 @@ instructionText += `Nội dung chuyển khoản phải đúng chính xác với 
 instructionText += `⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n`;
 
 instructionText += `⚠️ Lưu ý quan trọng:\n`;
-instructionText += `Nếu gặp lỗi (chuyển khoản thành công nhưng không nhận được truyện trong 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng ${orderId} và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n\n`;
+instructionText += `Nếu gặp lỗi (chuyển khoản thành công nhưng không nhận được truyện trong 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng ${orderId} và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n`;
 
-instructionText += `Cảm ơn bạn đã ủng hộ! ❤️`;
+// instructionText += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
 await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
 
