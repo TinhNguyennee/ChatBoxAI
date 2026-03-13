@@ -269,57 +269,73 @@ bot.on("message", async (msg) => {
     // Nội dung chuyển khoản
     let content = orderId;
 
-    // QR ngân hàng
-    let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
+// QR ngân hàng
+let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
 
-    // Phần 1: Danh sách truyện đã chọn + thông tin thanh toán (có thể tách nếu nhiều truyện)
-    const ITEMS_PER_CAPTION = 10; // Tối đa 10 truyện mỗi caption để an toàn
-    const totalParts = Math.ceil(selected.length / ITEMS_PER_CAPTION);
+// Chia danh sách thành các phần, mỗi phần tối đa 8 bộ
+const ITEMS_PER_PART = 8;
+const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
 
-    for (let i = 0; i < selected.length; i += ITEMS_PER_CAPTION) {
-      const chunk = selected.slice(i, i + ITEMS_PER_CAPTION);
-      const partNumber = Math.floor(i / ITEMS_PER_CAPTION) + 1;
+let partNumber = 1;
+let startIndex = 0;
 
-      let captionPart = `📦 ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\n`;
+while (startIndex < selected.length) {
+  const endIndex = Math.min(startIndex + ITEMS_PER_PART, selected.length);
+  const chunk = selected.slice(startIndex, endIndex);
 
-      captionPart += `Bạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n\n`;
+  let captionPart = `📦 ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\n`;
 
-      if (totalParts > 1 && partNumber === 1) {
-        captionPart += `(Danh sách còn tiếp tục ở phần sau...)\n\n`;
-      }
+  captionPart += `Bạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n\n`;
 
-      captionPart += `💰 Tổng tiền gốc: ${total.toLocaleString('vi-VN')}đ\n`;
-      captionPart += `🎁 Giảm giá: ${discount.toLocaleString('vi-VN')}đ\n`;
-      captionPart += `💳 Số tiền cần thanh toán: ${final.toLocaleString('vi-VN')}đ\n\n`;
+  if (endIndex < selected.length) {
+    captionPart += `(Còn tiếp tục ở phần sau...)\n\n`;
+  }
 
-      captionPart += `🧾 Mã đơn hàng: ${orderId}\n`;
-      captionPart += `📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
+  // Chỉ hiển thị tổng tiền + thanh toán ở phần CUỐI CÙNG
+  if (endIndex === selected.length) {
+    captionPart += `💰 Tổng tiền gốc: ${total.toLocaleString('vi-VN')}đ\n`;
+    captionPart += `🎁 Giảm giá: ${discount.toLocaleString('vi-VN')}đ\n`;
+    captionPart += `💳 Số tiền cần thanh toán: ${final.toLocaleString('vi-VN')}đ\n\n`;
 
-      captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
+    captionPart += `🧾 Mã đơn hàng: ${orderId}\n`;
+    captionPart += `📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
 
-      await bot.sendPhoto(msg.chat.id, qrLink, {
-        caption: captionPart,
-        parse_mode: 'Markdown'
-      });
+    captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
+  }
 
-      // Delay nhẹ nếu còn phần tiếp theo
-      if (partNumber < totalParts) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 giây
-      }
-    }
+  // Gửi tin nhắn
+  if (partNumber === 1) {
+    // Phần đầu tiên: kèm QR
+    await bot.sendPhoto(msg.chat.id, qrLink, {
+      caption: captionPart,
+      parse_mode: 'Markdown'
+    });
+  } else {
+    // Các phần sau: chỉ text
+    await bot.sendMessage(msg.chat.id, captionPart, { parse_mode: 'Markdown' });
+  }
 
-    // Phần 2: Tin nhắn riêng về hướng dẫn chuyển khoản + lưu ý (gửi sau cùng)
-    let instructionText = `🔗 Quét mã QR bên trên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\n`;
-    instructionText += `Nội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n`;
+  // Delay 1 giây giữa các tin nhắn (tránh flood)
+  if (endIndex < selected.length) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
 
-    instructionText += `⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n`;
+  startIndex = endIndex;
+  partNumber++;
+}
 
-    instructionText += `⚠️ Lưu ý quan trọng:\n`;
-    instructionText += `Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng ${orderId} và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n\n`;
+// Phần hướng dẫn chuyển khoản riêng (gửi cuối cùng)
+let instructionText = `🔗 Quét mã QR ở tin nhắn đầu tiên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\n`;
+instructionText += `Nội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n`;
 
-    instructionText += `Cảm ơn bạn đã ủng hộ! ❤️`;
+instructionText += `⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n`;
 
-    await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
+instructionText += `⚠️ Lưu ý quan trọng:\n`;
+instructionText += `Nếu gặp lỗi (chuyển khoản thành công nhưng không nhận được truyện trong 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng ${orderId} và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n\n`;
+
+instructionText += `Cảm ơn bạn đã ủng hộ! ❤️`;
+
+await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
 
   }
 });
