@@ -56,9 +56,7 @@ async function getBooks() {
   }
 }
 
-getBooks().then(books => {
-  console.log(books);  // Test hàm lấy sách (sẽ in ra danh sách sách hoặc mảng rỗng nếu lỗi)
-});
+
 
 // ======================
 //       WEBHOOK
@@ -163,6 +161,10 @@ Nhấn /list để xem danh sách truyện`);
 
 // LIST TRUYỆN
 bot.onText(/\/list/, async (msg) => {
+
+  getBooks().then(books => {
+    console.log(books);
+  });
   const books = await getBooks();
 
   if (books.length === 0) {
