@@ -171,7 +171,7 @@ bot.onText(/\/list/, async (msg) => {
       return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @Falris_tn để kiểm tra nhé!');
     }
 
-    const ITEMS_PER_MESSAGE = 4;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
+    const ITEMS_PER_MESSAGE = 3;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
     const totalMessages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
 
     for (let i = 0; i < books.length; i += ITEMS_PER_MESSAGE) {
@@ -208,7 +208,7 @@ bot.onText(/\/list/, async (msg) => {
 
       // Delay nhẹ giữa các tin nhắn để tránh flood (Telegram giới hạn ~30 msg/giây nhưng an toàn hơn)
       if (partNumber < totalMessages) {
-        await new Promise(resolve => setTimeout(resolve, 800)); // 0.8 giây
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 giây
       }
     }
 
