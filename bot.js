@@ -1,46 +1,61 @@
 const TelegramBot = require('node-telegram-bot-api');
-// const QRCode = require("qrcode");
+const { Pool } = require('pg');
+const express = require("express");
+const bodyParser = require("body-parser");
 
-// TOKEN mới của bạn
+// TOKEN từ env
 const token = process.env.BOT_TOKEN;
-
 const bot = new TelegramBot(token);
 
+// Kết nối Neon PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }  // Bắt buộc với Neon
+});
 
+// Test kết nối lúc start server
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('❌ Lỗi kết nối Neon DB:', err.stack);
+  } else {
+    console.log('✅ Kết nối Neon PostgreSQL thành công!');
+    release();
+  }
+});
 
-// danh sách truyện
-const fs = require("fs");
-
-function getBooks(){
- const data = fs.readFileSync("./books.json","utf8");
- return JSON.parse(data);
+// Hàm lấy danh sách truyện từ DB (async)
+async function getBooks() {
+  try {
+    const res = await pool.query('SELECT * FROM books ORDER BY id ASC');
+    return res.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      chapters: row.chapters,
+      chapterLength: row.chapterlength,
+      description: row.description,
+      free: row.free,
+      price: row.price,
+      link: row.link || '',           // field link để gửi sau
+      genres: row.genres ? row.genres.split(', ') : []
+    }));
+  } catch (err) {
+    console.error('❌ Lỗi query books:', err.stack);
+    return [];  // trả về mảng rỗng nếu lỗi
+  }
 }
 
-  const books2 = getBooks();
-  const books = books2.map((b, index) => ({
-    id: index + 1,
-    name: b.name,
-    chapters: b.chapters,
-    chapterLength: b.chapterLength,
-    description: b.description,
-    free: b.free,
-    price: b.price
-  }));
-
-// nơi lưu đơn hàng
+// Nơi lưu đơn hàng tạm thời (trong RAM)
 const orders = {};
 
-// tạo mã đơn
-function createOrderId(){
- return "OD" + Math.floor(Math.random()*1000000);
+// Tạo mã đơn
+function createOrderId() {
+  return "OD" + Math.floor(Math.random() * 1000000);
 }
 
 // START
 bot.onText(/\/start/, (msg) => {
-  const books2 = getBooks();
-
-bot.sendMessage(msg.chat.id,
-`🐸 Chào mừng đến với Truyện Ếch Xanh
+  bot.sendMessage(msg.chat.id,
+    `🐸 Chào mừng đến với Truyện Ếch Xanh
 
 - Chat Box này dùng để xem list truyện, giá và mua truyện trực tiếp qua bot.
 
@@ -50,104 +65,95 @@ bot.sendMessage(msg.chat.id,
 • Ví dụ: Mua 3 bộ giảm 20k, mua 4 bộ giảm 30k, mua 5 bộ giảm 40k...
 
 Nhấn /list để xem danh sách truyện`);
-
 });
 
 // LIST TRUYỆN
-bot.onText(/\/list/, (msg) => {
+bot.onText(/\/list/, async (msg) => {
+  const books = await getBooks();
+
+  if (books.length === 0) {
+    return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @Falris_tn để kiểm tra nhé!');
+  }
 
   let text = "📚 Danh sách truyện:\n\n";
 
-  console.log("Books:", books);
-
-  // books.forEach(b => {
-  //   text += `-----------------------------\n`;
+  books.forEach(b => {
+    text += `-----------------------------\n`;
     
-  //   // Tiêu đề truyện + giá
-  //   if (b.free) {
-  //     text += `${b.id}*. ${b.name}\n`;
-  //   } else {
-  //     text += `${b.id}. ${b.name}\n`;
-  //   }
+    if (b.free) {
+      text += `${b.id}*. ${b.name}\n`;
+    } else {
+      text += `${b.id}. ${b.name}\n`;
+    }
     
-  //   // Thông tin chi tiết
-  //   text += `   📖 Số chương: ${b.chapters}\n`;
-  //   text += `   📏 Độ dài: ${b.chapterLength}\n`;
-  //   // text += `   🎭 Thể loại: ${(b.genres || []).join(", ")}\n`;
-  //   text += `   📝 Nội dung: ${b.description}\n\n`;
-  //   text += `   💰 Giá: ${b.free ? "Free" : b.price + "đ"}\n`;
-  // });
+    text += `   📖 Số chương: ${b.chapters}\n`;
+    text += `   📏 Độ dài: ${b.chapterLength}\n`;
+    text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+    text += `   📝 Nội dung: ${b.description}\n\n`;
+    text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n`;
+  });
 
-  text += `✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
+  text += `\n✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
   text += `Ví dụ: 1 2 4\n`;
 
   bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 });
 
-// KHI KHÁCH CHỌN TRUYỆN
-bot.on("message",(msg)=>{
+// XỬ LÝ CHỌN TRUYỆN
+bot.on("message", async (msg) => {
+  let text = msg.text;
+  if (!text) return;
 
-let text = msg.text;
+  // Bỏ qua nếu là lệnh (để tránh xử lý /list, /start làm tin nhắn chọn)
+  if (text.startsWith('/')) return;
 
-if(!text) return;
+  // Kiểm tra nhập số (ví dụ: 1 3 5)
+  if (/^[0-9 ]+$/.test(text)) {
+    let ids = text.split(" ").map(Number).filter(n => !isNaN(n));
 
-// kiểm tra người dùng nhập số
-if(/^[0-9 ]+$/.test(text)){
+    const allBooks = await getBooks();
+    let selected = allBooks.filter(b => ids.includes(b.id));
 
-let ids = text.split(" ").map(Number);
+    if (selected.length === 0) {
+      return bot.sendMessage(msg.chat.id, 'Không tìm thấy truyện nào với số bạn nhập 😕. Hãy thử lại nhé!');
+    }
 
-// truyện đã chọn
-  const books = getBooks();
+    // Loại truyện free
+    let paidBooks = selected.filter(b => !b.free);
 
-let selected = books.filter(b=>ids.includes(b.id));
+    // Tính tổng tiền
+    let total = paidBooks.reduce((s, b) => s + b.price, 0);
 
-if(selected.length===0){
- return;
-}
+    // Số truyện tính tiền
+    let count = paidBooks.length;
 
-// loại truyện free
-let paidBooks = selected.filter(b=>!b.free);
+    // Tính giảm giá
+    let discount = 0;
+    if (count >= 3) discount += 20000;
+    if (count >= 4) discount += (count - 3) * 10000;
 
-// tính tổng tiền
-let total = paidBooks.reduce((s,b)=>s+b.price,0);
+    // Tiền cuối
+    let final = total - discount;
 
-// số truyện tính tiền
-let count = paidBooks.length;
+    // Tạo đơn
+    let orderId = createOrderId();
 
-// tính giảm giá
-let discount = 0;
+    orders[orderId] = {
+      chatId: msg.chat.id,
+      books: selected,
+      amount: final,
+      paid: false
+    };
 
-if(count>=3){
- discount+=20000;
-}
+    // Nội dung chuyển khoản
+    let content = orderId;
 
-if(count>=4){
- discount+=(count-3)*10000;
-}
+    // QR ngân hàng
+    let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
 
-// tiền cuối
-let final = total-discount;
-
-// tạo đơn
-let orderId = createOrderId();
-
-orders[orderId] = {
- chatId: msg.chat.id,
- books: selected,
- amount: final,
- paid:false
-};
-
-// nội dung chuyển khoản
-let content = orderId;
-
-// QR ngân hàng
-let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
-
-// gửi QR
-bot.sendPhoto(msg.chat.id, qrLink, {
-  
-  caption: `📦 **ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG!**
+    // Gửi QR + caption
+    bot.sendPhoto(msg.chat.id, qrLink, {
+      caption: `📦 **ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG!**
 
 Bạn đã chọn:
 ${selected.map(b => `• ${b.name}`).join("\n")}
@@ -165,78 +171,52 @@ ${selected.map(b => `• ${b.name}`).join("\n")}
 ⏳ Sau khi nhận được thanh toán, bot sẽ **tự động gửi link truyện** cho bạn ngay lập tức.
 
 ⚠️ **Lưu ý quan trọng:**  
-Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng liên hệ ngay admin qua @Falris_tn hoặc gửi tin nhắn chứa mã đơn hàng ${orderId} để được hỗ trợ nhanh chóng nhé! Chúng tôi sẽ kiểm tra và xử lý trong thời gian sớm nhất.
+Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng liên hệ ngay admin qua @Falris_tn hoặc gửi tin nhắn chứa mã đơn hàng ${orderId} để được hỗ trợ nhanh chóng nhé!
 
 Cảm ơn bạn đã ủng hộ! ❤️`,
-  parse_mode: 'Markdown'
+      parse_mode: 'Markdown'
+    });
+  }
 });
 
-}
+// Webhook Sepay
+app.post("/sepay", (req, res) => {
+  console.log("Webhook Sepay:", req.body);
 
-});
+  let data = req.body;
+  let content = (data.content || data.description || "").trim().toUpperCase();
+  let amount = data.transferAmount || data.amount;
 
+  let orderId = Object.keys(orders).find(id => content.includes(id));
+  let order = orders[orderId];
 
+  if (order && !order.paid) {
+    if (order.amount == amount) {
+      order.paid = true;
 
+      // Chuẩn bị danh sách link đẹp
+      let bookLinksText = order.books
+        .map((b, index) => {
+          let linkParts = b.link.split(', ').map(part => part.trim());
+          
+          let linksDisplay = linkParts
+            .map((part, i) => {
+              if (part.includes('(Part')) {
+                return part;
+              } else if (linkParts.length > 1) {
+                return `Link part ${i + 1}: ${part}`;
+              } else {
+                return part;
+              }
+            })
+            .join("\n");
 
-
-const express = require("express");
-const bodyParser = require("body-parser");
-
-const app = express();
-app.use(bodyParser.json());
-
-app.post(`/bot${token}`, (req, res) => {
- bot.processUpdate(req.body);
- res.sendStatus(200);
-});
-
-
-
-
-
-app.post("/sepay",(req,res)=>{
-
-console.log("Webhook:",req.body);
-
-let data = req.body;
-
-let content = (data.content || data.description || "").trim().toUpperCase();
-let amount = data.transferAmount || data.amount;
-
-let orderId = Object.keys(orders).find(id => content.includes(id));
-
-let order = orders[orderId];
-
-if(order && !order.paid){
-
-if (order.amount == amount) {
-  order.paid = true;
-
-
-  // Chuẩn bị danh sách link đẹp đẽ
-  let bookLinksText = order.books
-    .map((b, index) => {
-      // Tách link nếu có nhiều part (dùng dấu phẩy hoặc " (Part " để phân biệt)
-      let linkParts = b.link.split(', ').map(part => part.trim());
-      
-      let linksDisplay = linkParts
-        .map((part, i) => {
-          if (part.includes('(Part')) {
-            return part; // đã có (Part 1), (Part 2) sẵn
-          } else if (linkParts.length > 1) {
-            return `Link part ${i + 1}: ${part}`;
-          } else {
-            return part;
-          }
+          return `${index + 1}. ${b.name}\n${linksDisplay}`;
         })
-        .join("\n");
+        .join("\n\n");
 
-      return `${index + 1}. ${b.name}\n${linksDisplay}`;
-    })
-    .join("\n\n");
-
-  bot.sendMessage(order.chatId,
-`✅ **THANH TOÁN THÀNH CÔNG!**
+      bot.sendMessage(order.chatId,
+        `✅ **THANH TOÁN THÀNH CÔNG!**
 
 Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã được mở khóa.
 
@@ -254,26 +234,30 @@ ${bookLinksText}
 📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, liên hệ admin @Falris_tn nhé!
 
 Chúc bạn đọc truyện vui vẻ! 🔥`,
-    { parse_mode: 'Markdown' }
-  );
-}
+        { parse_mode: 'Markdown' }
+      );
 
-}
+      // Optional: Xóa order sau khi gửi xong (tiết kiệm RAM)
+      delete orders[orderId];
+    }
+  }
 
-res.send("ok");
+  res.send("ok");
+});
 
+// Express server cho webhook
+const app = express();
+app.use(bodyParser.json());
+
+app.post(`/bot${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
 });
 
 const url = "https://chatboxai-eoul.onrender.com";
-
 bot.setWebHook(`${url}/bot${token}`);
 
-
-
-
 const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, ()=>{
- console.log("Server running");
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-
