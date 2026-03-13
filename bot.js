@@ -100,22 +100,22 @@ app.post("/sepay", (req, res) => {
         .join("\n\n");
 
       bot.sendMessage(order.chatId,
-        `✅ **THANH TOÁN THÀNH CÔNG!**
+        `✅ THANH TOÁN THÀNH CÔNG!
 
 Cảm ơn bạn đã ủng hộ! ❤️ Truyện đã được mở khóa.
 
-**Hướng dẫn đọc truyện trên điện thoại qua Link Google Docs:**
+Hướng dẫn đọc truyện trên điện thoại qua Link Google Docs:
 https://docs.google.com/document/d/1HYw_H1AzUoQwZudRZg3da4VlzMK7PEf-ey5jD2syMCY/edit?usp=sharing
 
 ---------------------------
 
-**Danh sách truyện của bạn:**
+Danh sách truyện của bạn:
 
 ${bookLinksText}
 
 ---------------------------
 
-📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, liên hệ admin @Falris_tn nhé!
+📌 Mẹo nhỏ: Mở link bằng app Google Docs để đọc mượt mà hơn (cuộn dễ, có mục lục chương). Nếu gặp vấn đề gì, liên hệ admin @ea7bpp nhé!
 
 Chúc bạn đọc truyện vui vẻ! 🔥`,
         { parse_mode: 'Markdown' }
@@ -168,7 +168,7 @@ bot.onText(/\/list/, async (msg) => {
     const books = await getBooks();
 
     if (books.length === 0) {
-      return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @Falris_tn để kiểm tra nhé!');
+      return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!');
     }
 
     const ITEMS_PER_MESSAGE = 3;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
@@ -197,12 +197,12 @@ bot.onText(/\/list/, async (msg) => {
       });
 
       // Nếu không phải phần cuối, thêm lời nhắc
-      if (partNumber < totalMessages) {
-        text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
+      if (partNumber >= totalMessages) {
+        // text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
+        text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
+        text += `Ví dụ: 1 3 5\n`;
       }
 
-      text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
-      text += `Ví dụ: 1 3 5\n`;
 
       await bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 
@@ -272,25 +272,55 @@ bot.on("message", async (msg) => {
     // QR ngân hàng
     let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
 
-    // Gửi QR + caption
-    bot.sendPhoto(msg.chat.id, qrLink, {
-      caption: `📦 **ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG!**
+    // Phần 1: Danh sách truyện đã chọn + thông tin thanh toán (có thể tách nếu nhiều truyện)
+    const ITEMS_PER_CAPTION = 10; // Tối đa 10 truyện mỗi caption để an toàn
+    const totalParts = Math.ceil(selected.length / ITEMS_PER_CAPTION);
 
-Bạn đã chọn:
-${selected.map(b => `• ${b.name}`).join("\n")}
+    for (let i = 0; i < selected.length; i += ITEMS_PER_CAPTION) {
+      const chunk = selected.slice(i, i + ITEMS_PER_CAPTION);
+      const partNumber = Math.floor(i / ITEMS_PER_CAPTION) + 1;
 
-💰 **Tổng tiền gốc:** ${total.toLocaleString('vi-VN')}đ
-🎁 **Giảm giá:** ${discount.toLocaleString('vi-VN')}đ
-💳 **Số tiền cần thanh toán:** ${final.toLocaleString('vi-VN')}đ
+      let captionPart = `📦 **ĐƠN HÀNG CỦA BẠN ĐÃ SẴN SÀNG!** (Phần ${partNumber}/${totalParts})\n\n`;
 
-🧾 **Mã đơn hàng:** ${orderId}
-📝 **Nội dung chuyển khoản chính xác:**  
-\`${content}\`
+      captionPart += `Bạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n\n`;
 
+      if (totalParts > 1 && partNumber === 1) {
+        captionPart += `(Danh sách còn tiếp tục ở phần sau...)\n\n`;
+      }
 
-Cảm ơn bạn đã ủng hộ! ❤️`,
-      parse_mode: 'Markdown'
-    });
+      captionPart += `💰 **Tổng tiền gốc:** ${total.toLocaleString('vi-VN')}đ\n`;
+      captionPart += `🎁 **Giảm giá:** ${discount.toLocaleString('vi-VN')}đ\n`;
+      captionPart += `💳 **Số tiền cần thanh toán:** ${final.toLocaleString('vi-VN')}đ\n\n`;
+
+      captionPart += `🧾 **Mã đơn hàng:** ${orderId}\n`;
+      captionPart += `📝 **Nội dung chuyển khoản chính xác:** \`${content}\`\n\n`;
+
+      captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
+
+      await bot.sendPhoto(msg.chat.id, qrLink, {
+        caption: captionPart,
+        parse_mode: 'Markdown'
+      });
+
+      // Delay nhẹ nếu còn phần tiếp theo
+      if (partNumber < totalParts) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 giây
+      }
+    }
+
+    // Phần 2: Tin nhắn riêng về hướng dẫn chuyển khoản + lưu ý (gửi sau cùng)
+    let instructionText = `🔗 **Quét mã QR bên trên** hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\n`;
+    instructionText += `Nội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n`;
+
+    instructionText += `⏳ Sau khi nhận được thanh toán, bot sẽ **tự động gửi link truyện** cho bạn ngay lập tức.\n\n`;
+
+    instructionText += `⚠️ **Lưu ý quan trọng:**\n`;
+    instructionText += `Nếu gặp lỗi trong quá trình thanh toán (chuyển khoản thành công nhưng không nhận được truyện trong vòng 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng **${orderId}** và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n\n`;
+
+    instructionText += `Cảm ơn bạn đã ủng hộ! ❤️`;
+
+    await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
+
   }
 });
 
