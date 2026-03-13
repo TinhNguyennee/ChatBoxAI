@@ -201,7 +201,7 @@ bot.onText(/\/list/, async (msg) => {
         text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
       }
 
-      text += `\n✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
+      text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
       text += `Ví dụ: 1 3 5\n`;
 
       await bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
