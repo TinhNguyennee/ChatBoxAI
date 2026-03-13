@@ -171,7 +171,7 @@ bot.onText(/\/list/, async (msg) => {
       return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @Falris_tn để kiểm tra nhé!');
     }
 
-    const ITEMS_PER_MESSAGE = 5;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
+    const ITEMS_PER_MESSAGE = 4;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
     const totalMessages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
 
     for (let i = 0; i < books.length; i += ITEMS_PER_MESSAGE) {
@@ -184,7 +184,7 @@ bot.onText(/\/list/, async (msg) => {
         text += `-----------------------------\n\n`;
 
         if (b.free) {
-          text += `${b.id}*. ${b.name}\n`;
+          text += `${b.id}. ${b.name}\n`;
         } else {
           text += `${b.id}. ${b.name}\n`;
         }
