@@ -286,6 +286,37 @@ bot.on("message", async (msg) => {
     // Tiền cuối
     let final = total - discount;
 
+    // ────────────────────────────────────────────────
+// THÊM KIỂM TRA NÀY
+if (final <= 0 || paidBooks.length === 0) {
+  // Trường hợp: toàn bộ free hoặc không có truyện nào cần trả tiền
+
+  let freeList = selected.map(b => `• ${b.id}. ${b.name}`).join("\n");
+
+  let text = `🎉 Tất cả truyện bạn chọn đều miễn phí!\n\n`;
+  text += `Danh sách truyện đã mở khóa ngay:\n${freeList}\n\n`;
+
+  // Nếu có link thì gửi luôn link (tương tự phần success)
+  if (selected.some(b => b.link && b.link.trim() !== '')) {
+    text += `Link tải/đọc:\n`;
+    selected.forEach(b => {
+      if (b.link && b.link.trim()) {
+        let links = b.link.split(', ').map(l => l.trim()).join("\n");
+        text += `${b.id}. ${b.name}\n${links}\n\n`;
+      }
+    });
+  } else {
+    text += `(Hiện chưa có link cho các truyện này. Liên hệ @ea7bpp để nhận nhé!)\n`;
+  }
+
+  text += `Chúc bạn đọc vui! 🔥\n`;
+  text += `Có thể tiếp tục chọn thêm truyện bằng cách nhập số khác.`;
+
+  bot.sendMessage(msg.chat.id, text);
+  return;  // dừng lại, không tạo đơn, không gửi QR
+}
+// ────────────────────────────────────────────────
+
     // Tạo đơn
     let orderId = createOrderId();
 
