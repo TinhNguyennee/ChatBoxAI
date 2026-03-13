@@ -48,23 +48,25 @@ bot.onText(/\/list/, (msg) => {
 
   let text = "📚 Danh sách truyện:\n\n";
 
-  books.forEach(b => {
-    text += `-----------------------------\n`;
+  console.log("Books:", books[0].id);
+
+  // books.forEach(b => {
+  //   text += `-----------------------------\n`;
     
-    // Tiêu đề truyện + giá
-    if (b.free) {
-      text += `${b.id}*. ${b.name}\n`;
-    } else {
-      text += `${b.id}. ${b.name}\n`;
-    }
+  //   // Tiêu đề truyện + giá
+  //   if (b.free) {
+  //     text += `${b.id}*. ${b.name}\n`;
+  //   } else {
+  //     text += `${b.id}. ${b.name}\n`;
+  //   }
     
-    // Thông tin chi tiết
-    text += `   📖 Số chương: ${b.chapters}\n`;
-    text += `   📏 Độ dài: ${b.chapterLength}\n`;
-    // text += `   🎭 Thể loại: ${(b.genres || []).join(", ")}\n`;
-    text += `   📝 Nội dung: ${b.description}\n\n`;
-    text += `   💰 Giá: ${b.free ? "Free" : b.price + "đ"}\n`;
-  });
+  //   // Thông tin chi tiết
+  //   text += `   📖 Số chương: ${b.chapters}\n`;
+  //   text += `   📏 Độ dài: ${b.chapterLength}\n`;
+  //   // text += `   🎭 Thể loại: ${(b.genres || []).join(", ")}\n`;
+  //   text += `   📝 Nội dung: ${b.description}\n\n`;
+  //   text += `   💰 Giá: ${b.free ? "Free" : b.price + "đ"}\n`;
+  // });
 
   text += `✍ Nhập số tương ứng với truyện bạn muốn mua, cách nhau bằng dấu cách nếu chọn nhiều truyện.\n`;
   text += `Ví dụ: 1 2 4\n`;
