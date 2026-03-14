@@ -392,7 +392,9 @@ instructionText += `Nội dung chuyển khoản phải đúng chính xác với 
 instructionText += `⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n`;
 
 instructionText += `⚠️ Lưu ý quan trọng:\n`;
-instructionText += `Nếu gặp lỗi (chuyển khoản thành công nhưng không nhận được truyện trong 5-10 phút), vui lòng gửi tin nhắn chứa mã đơn hàng ${orderId} và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n`;
+instructionText += `Khi tạo đơn mới thì mã QR của các đơn hàng trước bị vô hiệu.\n`;
+instructionText += `Chỉ quét mã QR của đơn tạo mới nhất.\n`;
+instructionText += `Nếu gặp lỗi (chuyển khoản thành công nhưng không nhận được truyện trong 5-10 phút), vui lòng liên hệ @ea7bpp gửi tin nhắn chứa mã đơn hàng ${orderId} và ảnh chụp chuyển khoản để được hỗ trợ nhanh chóng nhé!\n`;
 
 // instructionText += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
