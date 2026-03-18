@@ -190,65 +190,198 @@ bot.onText(/\/start/, (msg) => {
 Nhấn /list để xem danh sách truyện`);
 });
 
-// LIST TRUYỆN
-bot.onText(/\/list/, async (msg) => {
-  console.log("Hàm getBooks đã được gọi");
-
+// === THÊM HÀM HỖ TRỢ PHÂN TRANG (đặt ở đầu file, trước các bot.onText) ===
+async function generateListPage(page = 1) {
   try {
-    const books = await getBooks();
+    let books = await getBooks();
 
     if (books.length === 0) {
-      return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!');
+      return {
+        text: 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!',
+        inlineKeyboard: []
+      };
     }
 
-    const ITEMS_PER_MESSAGE = 3;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
-    const totalMessages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
+    // === ĐẢO NGƯỢC: truyện mới nhất (id lớn nhất) lên đầu ===
+    books.sort((a, b) => b.id - a.id); // Nếu id không tăng dần theo thời gian thì thay bằng .reverse()
 
-    for (let i = 0; i < books.length; i += ITEMS_PER_MESSAGE) {
-      const chunk = books.slice(i, i + ITEMS_PER_MESSAGE);
-      const partNumber = Math.floor(i / ITEMS_PER_MESSAGE) + 1;
+    const ITEMS_PER_MESSAGE = 3;
+    const totalPages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
 
-      let text = `📚 Danh sách truyện (Phần ${partNumber}/${totalMessages})\n\n`;
+    // Giới hạn page hợp lệ
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
 
-      chunk.forEach(b => {
-        text += `-----------------------------\n\n`;
+    const start = (page - 1) * ITEMS_PER_MESSAGE;
+    const chunk = books.slice(start, start + ITEMS_PER_MESSAGE);
 
-        if (b.free) {
-          text += `${b.id}. ${b.name}\n`;
-        } else {
-          text += `${b.id}. ${b.name}\n`;
-        }
+    let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
 
-        text += `   📖 Số chương: ${b.chapters}\n`;
-        text += `   📏 Độ dài: ${b.chapterLength}\n`;
-        text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
-        text += `   📝 Nội dung: ${b.description}\n`;
-        text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
-      });
+    chunk.forEach(b => {
+      text += `-----------------------------\n\n`;
+      text += `${b.id}. ${b.name}\n`;
+      text += `   📖 Số chương: ${b.chapters}\n`;
+      text += `   📏 Độ dài: ${b.chapterLength}\n`;
+      text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+      text += `   📝 Nội dung: ${b.description}\n`;
+      text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
+    });
 
-      // Nếu không phải phần cuối, thêm lời nhắc
-      if (partNumber >= totalMessages) {
-        // text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
-        text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
-        text += `Ví dụ: 1 3 5\n`;
-      }
+    // Hướng dẫn mua luôn hiển thị (vì chỉ có 1 tin nhắn)
+    text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
+    text += `Ví dụ: 1 3 5`;
 
+    // === XÂY DỰNG NÚT PHÂN TRANG ===
+    const inlineKeyboard = [];
 
-      await bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+    // Hàng 1: Trang đầu + Trang trước (chỉ hiện khi không phải trang 1)
+    const firstRow = [];
+    if (page > 1) {
+      firstRow.push({ text: '⏪ Trang đầu', callback_data: `list_page:1` });
+      firstRow.push({ text: '◀️ Trang trước', callback_data: `list_page:${page - 1}` });
+    }
+    if (firstRow.length > 0) inlineKeyboard.push(firstRow);
 
-      // Delay nhẹ giữa các tin nhắn để tránh flood (Telegram giới hạn ~30 msg/giây nhưng an toàn hơn)
-      if (partNumber < totalMessages) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1.5 giây
+    // Hàng số trang (5 nút mỗi hàng, hiện tất cả, trang hiện tại có 【 】)
+    let pageRow = [];
+    for (let p = 1; p <= totalPages; p++) {
+      const btnText = (p === page) ? `【${p}】` : `${p}`;
+      pageRow.push({ text: btnText, callback_data: `list_page:${p}` });
+
+      if (pageRow.length === 5 || p === totalPages) {
+        inlineKeyboard.push(pageRow);
+        pageRow = [];
       }
     }
 
-    console.log(`Đã gửi ${totalMessages} tin nhắn danh sách truyện cho user ${msg.chat.id}`);
+    // Hàng cuối: Trang sau + Trang cuối (chỉ hiện khi không phải trang cuối)
+    const lastRow = [];
+    if (page < totalPages) {
+      lastRow.push({ text: '▶️ Trang sau', callback_data: `list_page:${page + 1}` });
+      lastRow.push({ text: 'Trang cuối ⏩', callback_data: `list_page:${totalPages}` });
+    }
+    if (lastRow.length > 0) inlineKeyboard.push(lastRow);
 
+    return { text, inlineKeyboard };
+  } catch (err) {
+    console.error("Lỗi generateListPage:", err);
+    return {
+      text: 'Có lỗi khi tải danh sách truyện 😵. Thử lại sau hoặc liên hệ @ea7bpp nhé!',
+      inlineKeyboard: []
+    };
+  }
+}
+
+// === SỬA LẠI COMMAND /list (chỉ gửi trang 1) ===
+bot.onText(/\/list/, async (msg) => {
+  console.log("Hàm /list đã được gọi");
+
+  try {
+    const { text, inlineKeyboard } = await generateListPage(1);
+
+    await bot.sendMessage(msg.chat.id, text, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: inlineKeyboard }
+    });
+
+    console.log(`Đã gửi trang 1 danh sách truyện cho user ${msg.chat.id}`);
   } catch (err) {
     console.error("Lỗi khi gửi /list:", err.message || err);
     await bot.sendMessage(msg.chat.id, 'Có lỗi khi tải danh sách truyện 😵. Thử lại sau hoặc liên hệ @ea7bpp nhé!');
   }
 });
+
+// === THÊM HANDLER CALLBACK_QUERY (đặt ở bất kỳ đâu trong file bot, sau bot.onText) ===
+bot.on('callback_query', async (callbackQuery) => {
+  const data = callbackQuery.data;
+
+  // Chỉ xử lý nút phân trang của chúng ta
+  if (!data.startsWith('list_page:')) return;
+
+  const requestedPage = parseInt(data.split(':')[1]);
+  if (isNaN(requestedPage)) return;
+
+  try {
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+
+    const { text, inlineKeyboard } = await generateListPage(requestedPage);
+
+    // Edit tin nhắn hiện tại thành trang mới
+    await bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: inlineKeyboard }
+    });
+
+    // Xóa trạng thái "đang xử lý" của Telegram
+    await bot.answerCallbackQuery(callbackQuery.id);
+  } catch (err) {
+    console.error("Lỗi khi chuyển trang list:", err.message || err);
+    await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Có lỗi khi chuyển trang!' });
+  }
+});
+
+// // LIST TRUYỆN
+// bot.onText(/\/list/, async (msg) => {
+//   console.log("Hàm getBooks đã được gọi");
+
+//   try {
+//     const books = await getBooks();
+
+//     if (books.length === 0) {
+//       return bot.sendMessage(msg.chat.id, 'Hiện chưa có truyện nào trong database 😢. Liên hệ @ea7bpp để kiểm tra nhé!');
+//     }
+
+//     const ITEMS_PER_MESSAGE = 3;  // Có thể chỉnh thành 4 hoặc 6 tùy độ dài mô tả
+//     const totalMessages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
+
+//     for (let i = 0; i < books.length; i += ITEMS_PER_MESSAGE) {
+//       const chunk = books.slice(i, i + ITEMS_PER_MESSAGE);
+//       const partNumber = Math.floor(i / ITEMS_PER_MESSAGE) + 1;
+
+//       let text = `📚 Danh sách truyện (Phần ${partNumber}/${totalMessages})\n\n`;
+
+//       chunk.forEach(b => {
+//         text += `-----------------------------\n\n`;
+
+//         if (b.free) {
+//           text += `${b.id}. ${b.name}\n`;
+//         } else {
+//           text += `${b.id}. ${b.name}\n`;
+//         }
+
+//         text += `   📖 Số chương: ${b.chapters}\n`;
+//         text += `   📏 Độ dài: ${b.chapterLength}\n`;
+//         text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+//         text += `   📝 Nội dung: ${b.description}\n`;
+//         text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
+//       });
+
+//       // Nếu không phải phần cuối, thêm lời nhắc
+//       if (partNumber >= totalMessages) {
+//         // text += `Tiếp tục ở phần ${partNumber + 1}...\n`;
+//         text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
+//         text += `Ví dụ: 1 3 5\n`;
+//       }
+
+
+//       await bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+
+//       // Delay nhẹ giữa các tin nhắn để tránh flood (Telegram giới hạn ~30 msg/giây nhưng an toàn hơn)
+//       if (partNumber < totalMessages) {
+//         await new Promise(resolve => setTimeout(resolve, 1000)); // 1.5 giây
+//       }
+//     }
+
+//     console.log(`Đã gửi ${totalMessages} tin nhắn danh sách truyện cho user ${msg.chat.id}`);
+
+//   } catch (err) {
+//     console.error("Lỗi khi gửi /list:", err.message || err);
+//     await bot.sendMessage(msg.chat.id, 'Có lỗi khi tải danh sách truyện 😵. Thử lại sau hoặc liên hệ @ea7bpp nhé!');
+//   }
+// });
 
 // XỬ LÝ CHỌN TRUYỆN
 bot.on("message", async (msg) => {
@@ -401,6 +534,11 @@ instructionText += `Nếu gặp lỗi (chuyển khoản thành công nhưng khô
 await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
 
   }
+});
+
+
+app.get("/ping", (req, res) => {
+  res.send("alive");
 });
 
 // Khởi động server
