@@ -231,7 +231,7 @@ function getPageNumberButtons(currentPage, totalPages) {
   return buttons;
 }
 
-// Phân trang danh sách truyện - Có hiển thị VIP
+// Phân trang danh sách truyện - Hiển thị thông tin VIP
 async function generateListPage(page = 1, chatId = null) {
   try {
     let books = await getBooks();
@@ -250,16 +250,16 @@ async function generateListPage(page = 1, chatId = null) {
 
     let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
 
-    // === PHẦN HIỂN THỊ VIP ===
+    // === HIỂN THỊ THÔNG TIN VIP ===
     if (chatId) {
       const isVIP = await isUserVIP(chatId);
       if (isVIP) {
         text += `🎟️ BẠN ĐANG LÀ VIP MEMBER → Giảm thêm 50% trên mọi đơn hàng\n\n`;
       } else {
-        text += `💎 Chưa là VIP? Giảm 50% vĩnh viễn chỉ với 139k → Gõ /start để mua\n\n`;
+        text += `💎 Chưa là VIP? Giảm 50% hóa đơn vĩnh viễn chỉ với 139k → Gõ /start để mua\n\n`;
       }
     }
-    // ========================
+    // =================================
 
     chunk.forEach(b => {
       text += `-----------------------------\n\n`;
@@ -274,7 +274,7 @@ async function generateListPage(page = 1, chatId = null) {
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
     text += `Ví dụ: \`1 3 5\` hoặc gõ \`full\` / \`mua full\` để mua toàn bộ truyện có phí!`;
 
-    // Phần nút phân trang giữ nguyên
+    // Phần nút phân trang (giữ nguyên)
     const inlineKeyboard = [];
     const topRow = [
       { text: '⏪ Trang đầu', callback_data: 'list_page:1' },
@@ -329,7 +329,7 @@ bot.onText(/\/start/, async (msg) => {
       [{ text: "📚 Xem Danh Sách Truyện", callback_data: "show_list" }],
       isVIP 
         ? [{ text: "✅ Bạn đã là VIP Member", callback_data: "already_vip" }]  // nút vô hiệu chỉ để hiển thị
-        : [{ text: "💎 Mua VIP (139k) - Giảm 50% vĩnh viễn", callback_data: "buy_vip" }]
+        : [{ text: "💎 Mua VIP (139k) - Giảm 50% hóa đơn vĩnh viễn", callback_data: "buy_vip" }]
     ]
   };
 
@@ -339,7 +339,7 @@ bot.onText(/\/start/, async (msg) => {
   });
 });
 
-// /list (cập nhật để truyền chatId)
+// /list 
 bot.onText(/\/list/, async (msg) => {
   const { text, inlineKeyboard } = await generateListPage(1, msg.chat.id);
   await bot.sendMessage(msg.chat.id, text, {
@@ -384,7 +384,7 @@ bot.on('callback_query', async (callbackQuery) => {
 
     const caption = `💎 MUA VIP MEMBER - 139.000đ\n\n` +
       `Sau khi thanh toán bạn sẽ được:\n` +
-      `• Giảm 50% vĩnh viễn khi mua truyện\n\n` +
+      `• Giảm 50% hóa đơn vĩnh viễn khi mua truyện\n\n` +
       `🧾 Mã đơn hàng: \`${orderId}\`\n` +
       `📝 Nội dung chuyển khoản: \`${content}\`\n\n` +
       `Quét mã QR hoặc chuyển khoản MB Bank 0550767799967\n` +
@@ -397,7 +397,7 @@ bot.on('callback_query', async (callbackQuery) => {
 
   // Các callback cũ (show_list, pagination...)
   if (data === 'show_list') {
-    const { text, inlineKeyboard } = await generateListPage(1);
+    const { text, inlineKeyboard } = await generateListPage(1, chatId);
     await bot.sendMessage(chatId, text, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: inlineKeyboard }
