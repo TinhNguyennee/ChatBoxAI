@@ -174,6 +174,25 @@ bot.setWebHook(`${url}/bot${token}`)
 //       BOT LOGIC
 // ======================
 
+
+// Helper tạo nút số trang thông minh (tối đa 5 nút, theo đúng yêu cầu)
+function getPageNumberButtons(currentPage, totalPages) {
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, currentPage + 2);
+  
+  const buttons = [];
+  for (let p = startPage; p <= endPage; p++) {
+    const btnText = (p === currentPage) ? `【${p}】` : `${p}`;
+    buttons.push({
+      text: btnText,
+      callback_data: `list_page:${p}`
+    });
+  }
+  return buttons;
+}
+
+
+
 // Phân trang danh sách (giữ nguyên logic cũ, chỉ bổ sung text hướng dẫn mua full)
 async function generateListPage(page = 1) {
   try {
@@ -191,6 +210,7 @@ async function generateListPage(page = 1) {
     const ITEMS_PER_MESSAGE = 3;
     const totalPages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
 
+    // Clamp page
     if (page < 1) page = 1;
     if (page > totalPages) page = totalPages;
 
@@ -212,32 +232,26 @@ async function generateListPage(page = 1) {
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
     text += `Ví dụ: 1 3 5\nHoặc gõ \`full\` / \`mua full\` để mua toàn bộ truyện có phí!`;
 
+    // ==================== KEYBOARD MỚI ====================
     const inlineKeyboard = [];
 
-    const firstRow = [];
-    if (page > 1) {
-      firstRow.push({ text: '⏪ Trang đầu', callback_data: `list_page:1` });
-      firstRow.push({ text: '◀️ Trang trước', callback_data: `list_page:${page - 1}` });
-    }
-    if (firstRow.length > 0) inlineKeyboard.push(firstRow);
+    // Hàng trên: luôn hiển thị (Trang đầu + Trang trước)
+    const topRow = [
+      { text: '⏪ Trang đầu', callback_data: 'list_page:1' },
+      { text: '◀️ Trang trước', callback_data: page > 1 ? `list_page:${page - 1}` : 'noop:first' }
+    ];
+    inlineKeyboard.push(topRow);
 
-    let pageRow = [];
-    for (let p = 1; p <= totalPages; p++) {
-      const btnText = (p === page) ? `【${p}】` : `${p}`;
-      pageRow.push({ text: btnText, callback_data: `list_page:${p}` });
+    // Hàng số trang (tối đa 5 nút)
+    const pageButtons = getPageNumberButtons(page, totalPages);
+    inlineKeyboard.push(pageButtons);
 
-      if (pageRow.length === 5 || p === totalPages) {
-        inlineKeyboard.push(pageRow);
-        pageRow = [];
-      }
-    }
-
-    const lastRow = [];
-    if (page < totalPages) {
-      lastRow.push({ text: '▶️ Trang sau', callback_data: `list_page:${page + 1}` });
-      lastRow.push({ text: 'Trang cuối ⏩', callback_data: `list_page:${totalPages}` });
-    }
-    if (lastRow.length > 0) inlineKeyboard.push(lastRow);
+    // Hàng dưới: luôn hiển thị (Trang sau + Trang cuối)
+    const bottomRow = [
+      { text: '▶️ Trang sau', callback_data: page < totalPages ? `list_page:${page + 1}` : 'noop:last' },
+      { text: 'Trang cuối ⏩', callback_data: `list_page:${totalPages}` }
+    ];
+    inlineKeyboard.push(bottomRow);
 
     return { text, inlineKeyboard };
   } catch (err) {
@@ -290,7 +304,7 @@ bot.onText(/\/list/, async (msg) => {
   }
 });
 
-// Callback query (thêm xử lý nút show_list)
+// Callback query (đã nâng cấp pagination)
 bot.on('callback_query', async (callbackQuery) => {
   const data = callbackQuery.data;
 
@@ -312,7 +326,17 @@ bot.on('callback_query', async (callbackQuery) => {
     return;
   }
 
-  // Xử lý phân trang cũ
+  // Xử lý nút noop (đang ở trang đầu/cuối)
+  if (data === 'noop:first') {
+    await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Bạn đang ở trang đầu rồi!' });
+    return;
+  }
+  if (data === 'noop:last') {
+    await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Bạn đang ở trang cuối rồi!' });
+    return;
+  }
+
+  // Xử lý phân trang
   if (!data.startsWith('list_page:')) return;
 
   const requestedPage = parseInt(data.split(':')[1]);
