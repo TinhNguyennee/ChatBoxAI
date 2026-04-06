@@ -274,7 +274,7 @@ async function generateListPage(page = 1, chatId = null) {
     });
 
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
-    text += `Ví dụ: \`1 3 5\` \n hoặc gõ \`full\` để mua toàn bộ truyện!`;
+    text += `Ví dụ: \`1 3 5\` \n Hoặc gõ \`full\` để mua toàn bộ truyện!`;
 
     // Phần nút phân trang (giữ nguyên)
     const inlineKeyboard = [];
@@ -348,6 +348,19 @@ bot.onText(/\/list/, async (msg) => {
     parse_mode: 'Markdown',
     reply_markup: { inline_keyboard: inlineKeyboard }
   });
+});
+
+// ======================
+//   LỆNH XEM TELEGRAM ID
+// ======================
+bot.onText(/\/id/, async (msg) => {
+  const chatId = msg.chat.id;
+  const username = msg.from.username ? `@${msg.from.username}` : "Không có username";
+
+  const text = `🆔 **Telegram ID của bạn là:**\n\n` +
+               `\`${chatId}\`\n\n` +
+               `📌 Username: ${username}\n\n`;
+  await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
 });
 
 // Callback query
