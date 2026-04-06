@@ -53,15 +53,17 @@ async function addToVIP(chatId) {
   }
 }
 
-// Tăng sold_quantity cho các sách đã mua
+// Tăng sold_quantity cho các sách đã mua (cả free và có phí)
 async function incrementSoldQuantity(bookIds) {
   if (!bookIds || bookIds.length === 0) return;
+
   try {
-    await pool.query(
+    const res = await pool.query(
       'UPDATE books SET sold_quantity = COALESCE(sold_quantity, 0) + 1 WHERE id = ANY($1)',
       [bookIds]
     );
-    console.log(`📈 Đã +1 sold_quantity cho ${bookIds.length} truyện`);
+    
+    console.log(`📈 Đã +1 sold_quantity cho ${bookIds.length} truyện (ID: ${bookIds.join(', ')})`);
   } catch (err) {
     console.error('❌ Lỗi update sold_quantity:', err);
   }
@@ -272,7 +274,7 @@ async function generateListPage(page = 1, chatId = null) {
     });
 
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
-    text += `Ví dụ: \`1 3 5\` hoặc gõ \`full\` / \`mua full\` để mua toàn bộ truyện có phí!`;
+    text += `Ví dụ: \`1 3 5\` \n hoặc gõ \`full\` để mua toàn bộ truyện!`;
 
     // Phần nút phân trang (giữ nguyên)
     const inlineKeyboard = [];
@@ -467,12 +469,22 @@ bot.on("message", async (msg) => {
     vipDiscountText = `💎 Giảm VIP 50%: -${(afterOldDiscount - final).toLocaleString('vi-VN')}đ\n`;
   }
 
-  // Nếu toàn bộ free (hoặc sau VIP còn 0đ)
-  if (final <= 0 || paidBooks.length === 0) {
-    await bot.sendMessage(msg.chat.id, `🎉 Tất cả truyện bạn chọn đều miễn phí! Đang gửi link...`);
-    await sendBookLinks(msg.chat.id, selected, true);
-    return;
+// Nếu toàn bộ free (hoặc sau giảm giá còn 0đ)
+if (final <= 0 || paidBooks.length === 0) {
+  await bot.sendMessage(msg.chat.id, `🎉 Tất cả truyện bạn chọn đều miễn phí! Đang gửi link...`);
+
+  // === TĂNG sold_quantity cho truyện free ===
+  const freeBookIds = selected
+    .filter(b => b.free)           // chỉ lấy truyện free
+    .map(b => b.id);
+
+  if (freeBookIds.length > 0) {
+    await incrementSoldQuantity(freeBookIds);
   }
+
+  await sendBookLinks(msg.chat.id, selected, true);
+  return;
+}
 
   // Tạo đơn
   let orderId = createOrderId();
