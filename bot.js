@@ -231,8 +231,8 @@ function getPageNumberButtons(currentPage, totalPages) {
   return buttons;
 }
 
-// Phân trang danh sách (giữ nguyên)
-async function generateListPage(page = 1) {
+// Phân trang danh sách truyện - Có hiển thị VIP
+async function generateListPage(page = 1, chatId = null) {
   try {
     let books = await getBooks();
     if (books.length === 0) {
@@ -248,7 +248,19 @@ async function generateListPage(page = 1) {
     const start = (page - 1) * ITEMS_PER_MESSAGE;
     const chunk = books.slice(start, start + ITEMS_PER_MESSAGE);
 
-    let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
+    let text = `📚 *Danh sách truyện* (Trang ${page}/${totalPages})\n\n`;
+
+    // === PHẦN HIỂN THỊ VIP ===
+    if (chatId) {
+      const isVIP = await isUserVIP(chatId);
+      if (isVIP) {
+        text += `🎟️ **BẠN ĐANG LÀ VIP MEMBER** → Giảm thêm **50%** trên mọi đơn hàng\n\n`;
+      } else {
+        text += `💎 *Chưa là VIP?* Giảm **50%** vĩnh viễn chỉ với 139k → Gõ /start để mua\n\n`;
+      }
+    }
+    // ========================
+
     chunk.forEach(b => {
       text += `-----------------------------\n\n`;
       text += `${b.id}. ${b.name}\n`;
@@ -259,9 +271,10 @@ async function generateListPage(page = 1) {
       text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
     });
 
-    text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n\n`;
-    text += `Ví dụ: 1 3 5\nHoặc gõ \`full\` / \`mua full\` để mua toàn bộ truyện có phí!`;
+    text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
+    text += `Ví dụ: \`1 3 5\` hoặc gõ \`full\` / \`mua full\` để mua toàn bộ truyện có phí!`;
 
+    // Phần nút phân trang giữ nguyên
     const inlineKeyboard = [];
     const topRow = [
       { text: '⏪ Trang đầu', callback_data: 'list_page:1' },
@@ -286,38 +299,49 @@ async function generateListPage(page = 1) {
 }
 
 // ======================
-//   START + NÚT VIP MỚI
+//   START - HIỂN THỊ VIP TRỰC QUAN
 // ======================
 bot.onText(/\/start/, async (msg) => {
-  const welcomeText = `🐸 Chào mừng đến với *Truyện Ếch Xanh*
+  const chatId = msg.chat.id;
+  const isVIP = await isUserVIP(chatId);
 
-💎 *VIP Member* - Chỉ 139.000đ (một lần):
-• Giảm ngay **50%** trên tổng hóa đơn (sau khi đã trừ ưu đãi mua nhiều / full)
-• Áp dụng **vĩnh viễn** cho mọi lần mua sau
+  let welcomeText = `🐸 *Chào mừng bạn đến với Truyện Ếch Xanh*\n\n`;
 
-Ưu đãi mua nhiều vẫn giữ nguyên:
-• Từ bộ thứ 3 giảm 20k
-• Từ bộ thứ 4 giảm thêm 10k/bộ
-• Mua FULL giảm thêm 5k/truyện
+  if (isVIP) {
+    welcomeText += `🎟️ *BẠN ĐANG LÀ VIP MEMBER*\n`;
+    welcomeText += `💎 Được giảm **50%** vĩnh viễn trên mọi lần mua truyện\n\n`;
+    welcomeText += `Bạn có thể mua truyện ngay với giá siêu ưu đãi!\n\n`;
+  } else {
+    welcomeText += `💎 *VIP Member* - Chỉ **139.000đ** (một lần mua):\n`;
+    welcomeText += `• Giảm ngay **50%** trên tổng hóa đơn (sau ưu đãi mua nhiều/full)\n`;
+    welcomeText += `• Áp dụng **vĩnh viễn** cho mọi lần mua sau\n\n`;
+  }
 
-Chọn ngay bên dưới nhé!`;
+  welcomeText += `Ưu đãi mua nhiều vẫn áp dụng bình thường:\n`;
+  welcomeText += `• Từ bộ thứ 3 giảm 20k\n`;
+  welcomeText += `• Từ bộ thứ 4 giảm thêm 10k/bộ\n`;
+  welcomeText += `• Mua FULL giảm thêm 5k/truyện\n\n`;
+
+  welcomeText += `Chọn ngay bên dưới nhé! 🔥`;
 
   const keyboard = {
     inline_keyboard: [
       [{ text: "📚 Xem Danh Sách Truyện", callback_data: "show_list" }],
-      [{ text: "💎 Mua VIP (139k) - Giảm 50%", callback_data: "buy_vip" }]
+      isVIP 
+        ? [{ text: "✅ Bạn đã là VIP Member", callback_data: "already_vip" }]  // nút vô hiệu chỉ để hiển thị
+        : [{ text: "💎 Mua VIP (139k) - Giảm 50% vĩnh viễn", callback_data: "buy_vip" }]
     ]
   };
 
-  await bot.sendMessage(msg.chat.id, welcomeText, { 
+  await bot.sendMessage(chatId, welcomeText, { 
     parse_mode: 'Markdown',
     reply_markup: keyboard 
   });
 });
 
-// /list (giữ tương thích)
+// /list (cập nhật để truyền chatId)
 bot.onText(/\/list/, async (msg) => {
-  const { text, inlineKeyboard } = await generateListPage(1);
+  const { text, inlineKeyboard } = await generateListPage(1, msg.chat.id);
   await bot.sendMessage(msg.chat.id, text, {
     parse_mode: 'Markdown',
     reply_markup: { inline_keyboard: inlineKeyboard }
@@ -336,6 +360,14 @@ bot.on('callback_query', async (callbackQuery) => {
       await bot.sendMessage(chatId, '🎟️ Bạn đã là VIP Member rồi! Không cần mua lại nhé.');
       return bot.answerCallbackQuery(callbackQuery.id);
     }
+
+      // Xử lý nút VIP đã mua
+  if (data === 'already_vip') {
+    await bot.answerCallbackQuery(callbackQuery.id, { 
+      text: '✅ Bạn đã là VIP Member rồi!' 
+    });
+    return;
+  }
 
     const vipPrice = 139000;
     const orderId = createOrderId();
