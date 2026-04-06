@@ -274,7 +274,7 @@ async function generateListPage(page = 1, chatId = null) {
     });
 
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
-    text += `Ví dụ: \`1 3 5\` \n Hoặc gõ \`full\` để mua toàn bộ truyện!`;
+    text += `Ví dụ: \`1 3 5\`\nHoặc gõ \`full\` để mua toàn bộ truyện!`;
 
     // Phần nút phân trang (giữ nguyên)
     const inlineKeyboard = [];
