@@ -331,7 +331,7 @@ bot.onText(/\/start/, async (msg) => {
       [{ text: "📚 Xem Danh Sách Truyện", callback_data: "show_list" }],
       isVIP 
         ? [{ text: "✅ Bạn đã là VIP Member", callback_data: "already_vip" }]  // nút vô hiệu chỉ để hiển thị
-        : [{ text: "💎 Mua VIP (139k) - Giảm 50% hóa đơn vĩnh viễn", callback_data: "buy_vip" }]
+        : [{ text: "💎 Mua VIP (139k) - Vĩnh viễn", callback_data: "buy_vip" }]
     ]
   };
 
@@ -414,7 +414,7 @@ bot.on('callback_query', async (callbackQuery) => {
 
   if (data.startsWith('list_page:')) {
     const requestedPage = parseInt(data.split(':')[1]);
-    const { text, inlineKeyboard } = await generateListPage(requestedPage);
+    const { text, inlineKeyboard } = await generateListPage(requestedPage, chatId);
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: callbackQuery.message.message_id,
