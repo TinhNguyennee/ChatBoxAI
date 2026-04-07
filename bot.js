@@ -249,7 +249,7 @@ function getPageNumberButtons(currentPage, totalPages) {
   return buttons;
 }
 
-// Generate danh sách truyện - ĐÃ FIX CHẮC CHẮN
+// Generate danh sách truyện - ĐÃ XÓA TẠM THỜI PHẦN PHÂN TRANG
 async function generateListPage(page = 1, chatId = null) {
   try {
     let books = await getBooks();
@@ -261,10 +261,7 @@ async function generateListPage(page = 1, chatId = null) {
     }
 
     books.sort((a, b) => b.id - a.id);
-
-    const ITEMS_PER_MESSAGE = 3;           // Giữ 3 truyện mỗi trang
-    const MAX_DESC_LENGTH = 80;            // Giới hạn description
-
+    const ITEMS_PER_MESSAGE = 3;
     const totalPages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
     if (page < 1) page = 1;
     if (page > totalPages) page = totalPages;
@@ -274,7 +271,7 @@ async function generateListPage(page = 1, chatId = null) {
 
     let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
 
-    // Phần VIP
+    // Kiểm tra VIP an toàn
     if (chatId) {
       const isVIP = await isUserVIP(chatId);
       if (isVIP) {
@@ -285,43 +282,22 @@ async function generateListPage(page = 1, chatId = null) {
     }
 
     chunk.forEach(b => {
-      // Rút gọn description nếu quá dài
-      let desc = b.description || '';
-      if (desc.length > MAX_DESC_LENGTH) {
-        desc = desc.substring(0, MAX_DESC_LENGTH).trim() + '...';
-      }
-
       text += `-----------------------------\n\n`;
       text += `${b.id}. ${b.name}\n`;
       text += `   📖 Số chương: ${b.chapters}\n`;
       text += `   📏 Độ dài: ${b.chapterLength}\n`;
       text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
-      text += `   📝 Nội dung: ${desc}\n`;
+      text += `   📝 Nội dung: ${b.description}\n`;
       text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
     });
 
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
     text += `Ví dụ: \`1 3 5\`\nHoặc gõ \`full\` để mua toàn bộ truyện!`;
 
-    // Tạo keyboard
+    // === TẠM THỜI XÓA TOÀN BỘ PHẦN NÚT PHÂN TRANG ===
     const inlineKeyboard = [];
 
-    const topRow = [
-      { text: '⏪ Trang đầu', callback_data: page === 1 ? 'noop:first' : 'list_page:1' },
-      { text: '◀️ Trang trước', callback_data: page > 1 ? `list_page:${page - 1}` : 'noop:first' }
-    ];
-    inlineKeyboard.push(topRow);
-
-    inlineKeyboard.push(getPageNumberButtons(page, totalPages));
-
-    const bottomRow = [
-      { text: '▶️ Trang sau', callback_data: page < totalPages ? `list_page:${page + 1}` : 'noop:last' },
-      { text: 'Trang cuối ⏩', callback_data: page === totalPages ? 'noop:last' : `list_page:${totalPages}` }
-    ];
-    inlineKeyboard.push(bottomRow);
-
     return { text, inlineKeyboard };
-
   } catch (err) {
     console.error("❌ Lỗi generateListPage:", err.message);
     return { 
