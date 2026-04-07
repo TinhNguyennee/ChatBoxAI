@@ -384,26 +384,21 @@ bot.onText(/\/id/, async (msg) => {
   await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
 });
 
-// Callback query
+// Callback query - ĐÃ SỬA CẤU TRÚC
 bot.on('callback_query', async (callbackQuery) => {
   const data = callbackQuery.data;
   const chatId = callbackQuery.message.chat.id;
 
-  // Xử lý nút VIP
+  // Trả lời callback ngay để tránh nút quay quay
+  await bot.answerCallbackQuery(callbackQuery.id);
+
+  // === XỬ LÝ VIP ===
   if (data === 'buy_vip') {
     const alreadyVIP = await isUserVIP(chatId);
     if (alreadyVIP) {
       await bot.sendMessage(chatId, '🎟️ Bạn đã là VIP Member rồi! Không cần mua lại nhé.');
-      return bot.answerCallbackQuery(callbackQuery.id);
+      return;
     }
-
-      // Xử lý nút VIP đã mua
-  if (data === 'already_vip') {
-    await bot.answerCallbackQuery(callbackQuery.id, { 
-      text: '✅ Bạn đã là VIP Member rồi!' 
-    });
-    return;
-  }
 
     const vipPrice = 139000;
     const orderId = createOrderId();
@@ -427,40 +422,45 @@ bot.on('callback_query', async (callbackQuery) => {
       `Bot sẽ tự động xác nhận ngay khi nhận tiền!`;
 
     await bot.sendPhoto(chatId, qrLink, { caption, parse_mode: 'Markdown' });
-    await bot.answerCallbackQuery(callbackQuery.id, { text: 'Đã tạo đơn VIP!' });
     return;
   }
 
-  // Các callback cũ (show_list, pagination...)
+  if (data === 'already_vip') {
+    await bot.sendMessage(chatId, '✅ Bạn đã là VIP Member rồi!');
+    return;
+  }
+
+  // === XỬ LÝ DANH SÁCH TRUYỆN ===
   if (data === 'show_list') {
     const { text, inlineKeyboard } = await generateListPage(1, chatId);
     await bot.sendMessage(chatId, text, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: inlineKeyboard }
     });
-    return bot.answerCallbackQuery(callbackQuery.id);
+    return;
   }
 
-  if (data === 'noop:first' || data === 'noop:last' || data === 'noop:current') {
-    let message = '';
-    if (data === 'noop:first') message = '✅ Bạn đang ở trang đầu rồi!';
-    else if (data === 'noop:last') message = '✅ Bạn đang ở trang cuối rồi!';
-    else if (data === 'noop:current') message = '✅ Bạn đang xem trang này rồi!';
+  // === XỬ LÝ PHÂN TRANG ===
+  if (data === 'noop:first') {
+    await bot.sendMessage(chatId, '✅ Bạn đang ở trang đầu rồi!');
+    return;
+  }
 
-    await bot.answerCallbackQuery(callbackQuery.id, { text: message });
+  if (data === 'noop:last') {
+    await bot.sendMessage(chatId, '✅ Bạn đang ở trang cuối rồi!');
     return;
   }
 
   if (data.startsWith('list_page:')) {
     const requestedPage = parseInt(data.split(':')[1]);
     const { text, inlineKeyboard } = await generateListPage(requestedPage, chatId);
+
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: callbackQuery.message.message_id,
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: inlineKeyboard }
     });
-    await bot.answerCallbackQuery(callbackQuery.id);
   }
 });
 
