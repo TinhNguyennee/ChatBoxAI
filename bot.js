@@ -249,7 +249,7 @@ function getPageNumberButtons(currentPage, totalPages) {
   return buttons;
 }
 
-// PHIÊN BẢN TỐI GIẢN - DÙNG ĐỂ DEBUG TREO
+// PHIÊN BẢN ĐÃ GIỚI HẠN NỘI DUNG - TỐI ƯU ĐỘ DÀI TEXT
 async function generateListPage(page = 1, chatId = null) {
   try {
     console.log(`[DEBUG] generateListPage bắt đầu - page: ${page}`);
@@ -276,19 +276,26 @@ async function generateListPage(page = 1, chatId = null) {
 
     let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
 
-    // Bỏ hoàn toàn phần VIP để test
-    // if (chatId) { ... }  ← đã comment hết
+    chunk.forEach((b) => {
+      // Giới hạn nội dung chỉ còn 50 ký tự
+      let desc = b.description ? b.description.trim() : '';
+      if (desc.length > 50) {
+        desc = desc.substring(0, 47) + '...';
+      }
 
-    chunk.forEach((b, index) => {
       text += `-----------------------------\n\n`;
       text += `${b.id}. ${b.name || 'Không tên'}\n`;
       text += `   📖 Số chương: ${b.chapters || 0}\n`;
+      text += `   📏 Độ dài: ${b.chapterLength || 'N/A'}\n`;
+      text += `   🎭 Thể loại: ${b.genres ? b.genres.join(", ") : 'Không có'}\n`;
+      text += `   📝 Nội dung: ${desc}\n`;
       text += `   💰 Giá: ${b.free ? "Free" : (b.price || 0).toLocaleString('vi-VN') + "đ"}\n\n`;
     });
 
-    text += `✍ Nhập số truyện muốn mua (cách nhau bằng dấu cách) hoặc gõ \`full\` để mua hết.`;
+    text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách).\n`;
+    text += `Ví dụ: \`1 3 5\` hoặc gõ \`full\` để mua toàn bộ!`;
 
-    // Inline keyboard đơn giản nhất
+    // Inline keyboard giữ nguyên phiên bản đơn giản
     const inlineKeyboard = [
       [
         { text: '⏪ Đầu', callback_data: 'list_page:1' },
