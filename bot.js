@@ -226,9 +226,14 @@ function getPageNumberButtons(currentPage, totalPages) {
   const startPage = Math.max(1, currentPage - 2);
   const endPage = Math.min(totalPages, currentPage + 2);
   const buttons = [];
+
   for (let p = startPage; p <= endPage; p++) {
-    const btnText = (p === currentPage) ? `【${p}】` : `${p}`;
-    buttons.push({ text: btnText, callback_data: `list_page:${p}` });
+    if (p === currentPage) {
+      // Nút trang hiện tại → KHÔNG clickable nữa (không có callback_data)
+      buttons.push({ text: `【${p}】` });
+    } else {
+      buttons.push({ text: `${p}`, callback_data: `list_page:${p}` });
+    }
   }
   return buttons;
 }
@@ -276,20 +281,36 @@ async function generateListPage(page = 1, chatId = null) {
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
     text += `Ví dụ: \`1 3 5\`\nHoặc gõ \`full\` để mua toàn bộ truyện!`;
 
-    // Phần nút phân trang (giữ nguyên)
+     // === NÚT PHÂN TRANG ĐÃ FIX (không còn edit vô ích) ===
     const inlineKeyboard = [];
+
+    // Top row
     const topRow = [
-      { text: '⏪ Trang đầu', callback_data: 'list_page:1' },
-      { text: '◀️ Trang trước', callback_data: page > 1 ? `list_page:${page - 1}` : 'noop:first' }
+      { 
+        text: '⏪ Trang đầu', 
+        callback_data: page === 1 ? 'noop:first' : 'list_page:1' 
+      },
+      { 
+        text: '◀️ Trang trước', 
+        callback_data: page > 1 ? `list_page:${page - 1}` : 'noop:first' 
+      }
     ];
     inlineKeyboard.push(topRow);
 
+    // Page numbers
     const pageButtons = getPageNumberButtons(page, totalPages);
     inlineKeyboard.push(pageButtons);
 
+    // Bottom row
     const bottomRow = [
-      { text: '▶️ Trang sau', callback_data: page < totalPages ? `list_page:${page + 1}` : 'noop:last' },
-      { text: 'Trang cuối ⏩', callback_data: `list_page:${totalPages}` }
+      { 
+        text: '▶️ Trang sau', 
+        callback_data: page < totalPages ? `list_page:${page + 1}` : 'noop:last' 
+      },
+      { 
+        text: 'Trang cuối ⏩', 
+        callback_data: page === totalPages ? 'noop:last' : `list_page:${totalPages}` 
+      }
     ];
     inlineKeyboard.push(bottomRow);
 
@@ -420,8 +441,13 @@ bot.on('callback_query', async (callbackQuery) => {
     return bot.answerCallbackQuery(callbackQuery.id);
   }
 
-  if (data === 'noop:first' || data === 'noop:last') {
-    await bot.answerCallbackQuery(callbackQuery.id, { text: data === 'noop:first' ? '✅ Bạn đang ở trang đầu!' : '✅ Bạn đang ở trang cuối!' });
+  if (data === 'noop:first' || data === 'noop:last' || data === 'noop:current') {
+    let message = '';
+    if (data === 'noop:first') message = '✅ Bạn đang ở trang đầu rồi!';
+    else if (data === 'noop:last') message = '✅ Bạn đang ở trang cuối rồi!';
+    else if (data === 'noop:current') message = '✅ Bạn đang xem trang này rồi!';
+
+    await bot.answerCallbackQuery(callbackQuery.id, { text: message });
     return;
   }
 
