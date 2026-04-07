@@ -291,8 +291,8 @@ async function generateListPage(page = 1, chatId = null) {
 
       // ========== GIỚI HẠN NỘI DUNG 90 KÝ TỰ ==========
       let description = b.description ? String(b.description).trim() : '';
-      if (description.length > 90) {
-        description = description.substring(0, 87) + '...';
+      if (description.length > 75) {
+        description = description.substring(0, 72) + '...';
       }
       text += `   📝 Nội dung: ${description}\n`;
       
