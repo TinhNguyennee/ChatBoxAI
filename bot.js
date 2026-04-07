@@ -26,13 +26,22 @@ function createOrderId() {
 }
 
 // ======================
-//   CÁC HÀM VIP + SOLD QUANTITY (ĐÃ FIX)
+//   HELPER CHO REPLY_MARKUP (SỬA LỖI CHÍNH)
+// ======================
+function createReplyMarkup(inlineKeyboard) {
+  return {
+    reply_markup: {
+      inline_keyboard: inlineKeyboard
+    }
+  };
+}
+
+// ======================
+//   CÁC HÀM VIP + SOLD QUANTITY
 // ======================
 
-// Kiểm tra user có phải VIP không - ĐÃ FIX AN TOÀN
 async function isUserVIP(chatId) {
   if (!chatId) return false;
-
   try {
     const res = await pool.query(
       'SELECT 1 FROM vip WHERE telegram_id = $1 LIMIT 1', 
@@ -45,7 +54,6 @@ async function isUserVIP(chatId) {
   }
 }
 
-// Thêm user vào bảng VIP
 async function addToVIP(chatId) {
   if (!chatId) return;
   try {
@@ -59,22 +67,19 @@ async function addToVIP(chatId) {
   }
 }
 
-// Tăng sold_quantity
 async function incrementSoldQuantity(bookIds) {
   if (!bookIds || bookIds.length === 0) return;
-
   try {
     await pool.query(
       'UPDATE books SET sold_quantity = COALESCE(sold_quantity, 0) + 1 WHERE id = ANY($1)',
       [bookIds]
     );
-    console.log(`📈 Đã +1 sold_quantity cho ${bookIds.length} truyện (ID: ${bookIds.join(', ')})`);
+    console.log(`📈 Đã +1 sold_quantity cho ${bookIds.length} truyện`);
   } catch (err) {
     console.error('❌ Lỗi update sold_quantity:', err.message);
   }
 }
 
-// Lấy danh sách truyện
 async function getBooks() {
   try {
     const res = await pool.query('SELECT * FROM books ORDER BY id ASC');
@@ -95,7 +100,6 @@ async function getBooks() {
   }
 }
 
-// Gửi link theo chunk
 async function sendBookLinks(chatId, books, isFree = false) {
   if (!chatId || !books || books.length === 0) return;
 
@@ -224,7 +228,7 @@ bot.setWebHook(`${url}/bot${token}`)
   .catch(err => console.error('❌ Lỗi set webhook Telegram:', err.message));
 
 // ======================
-//   GLOBAL ERROR HANDLER (RẤT QUAN TRỌNG)
+//   GLOBAL ERROR HANDLER
 // ======================
 bot.on('error', (err) => console.error('❌ Bot error:', err.message));
 bot.on('polling_error', (err) => console.error('❌ Polling error:', err.message));
@@ -233,7 +237,6 @@ bot.on('polling_error', (err) => console.error('❌ Polling error:', err.message
 //       BOT LOGIC
 // ======================
 
-// Phân trang
 function getPageNumberButtons(currentPage, totalPages) {
   const startPage = Math.max(1, currentPage - 2);
   const endPage = Math.min(totalPages, currentPage + 2);
@@ -249,7 +252,7 @@ function getPageNumberButtons(currentPage, totalPages) {
   return buttons;
 }
 
-// Generate danh sách truyện - ĐÃ FIX CHẮC CHẮN
+// Generate danh sách truyện - ĐÃ SỬA
 async function generateListPage(page = 1, chatId = null) {
   try {
     let books = await getBooks();
@@ -271,7 +274,6 @@ async function generateListPage(page = 1, chatId = null) {
 
     let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
 
-    // Kiểm tra VIP an toàn
     if (chatId) {
       const isVIP = await isUserVIP(chatId);
       if (isVIP) {
@@ -310,7 +312,10 @@ async function generateListPage(page = 1, chatId = null) {
     ];
     inlineKeyboard.push(bottomRow);
 
-    return { text, inlineKeyboard };
+    return { 
+      text, 
+      inlineKeyboard 
+    };
   } catch (err) {
     console.error("❌ Lỗi generateListPage:", err.message);
     return { 
@@ -346,18 +351,16 @@ bot.onText(/\/start/, async (msg) => {
 
   welcomeText += `Chọn ngay bên dưới nhé! 🔥`;
 
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: "📚 Xem Danh Sách Truyện", callback_data: "show_list" }],
-      isVIP 
-        ? [{ text: "✅ Bạn đã là VIP Member", callback_data: "already_vip" }]
-        : [{ text: "💎 Mua VIP (139k) - Vĩnh viễn", callback_data: "buy_vip" }]
-    ]
-  };
+  const keyboard = [
+    [{ text: "📚 Xem Danh Sách Truyện", callback_data: "show_list" }],
+    isVIP 
+      ? [{ text: "✅ Bạn đã là VIP Member", callback_data: "already_vip" }]
+      : [{ text: "💎 Mua VIP (139k) - Vĩnh viễn", callback_data: "buy_vip" }]
+  ];
 
   await bot.sendMessage(chatId, welcomeText, { 
     parse_mode: 'Markdown',
-    reply_markup: keyboard 
+    ...createReplyMarkup(keyboard)
   });
 });
 
@@ -366,7 +369,7 @@ bot.onText(/\/list/, async (msg) => {
   const { text, inlineKeyboard } = await generateListPage(1, msg.chat.id);
   await bot.sendMessage(msg.chat.id, text, {
     parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: inlineKeyboard }
+    ...createReplyMarkup(inlineKeyboard)
   });
 });
 
@@ -429,7 +432,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const { text, inlineKeyboard } = await generateListPage(1, chatId);
     await bot.sendMessage(chatId, text, {
       parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: inlineKeyboard }
+      ...createReplyMarkup(inlineKeyboard)
     });
     return;
   }
@@ -452,12 +455,12 @@ bot.on('callback_query', async (callbackQuery) => {
       chat_id: chatId,
       message_id: callbackQuery.message.message_id,
       parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: inlineKeyboard }
+      ...createReplyMarkup(inlineKeyboard)   // ← ĐÃ SỬA Ở ĐÂY
     }).catch(err => console.error('Lỗi edit message:', err.message));
   }
 });
 
-// Xử lý tin nhắn chọn truyện
+// Xử lý tin nhắn chọn truyện (không thay đổi)
 bot.on("message", async (msg) => {
   let text = msg.text;
   if (!text || text.startsWith('/')) return;
@@ -512,7 +515,6 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // Tạo đơn hàng
   let orderId = createOrderId();
   orders[orderId] = {
     chatId: msg.chat.id,
@@ -524,7 +526,6 @@ bot.on("message", async (msg) => {
   let content = orderId;
   let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
 
-  // Gửi giỏ hàng theo phần (giữ nguyên logic cũ)
   const ITEMS_PER_PART = 3;
   const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
   let partNumber = 1;
