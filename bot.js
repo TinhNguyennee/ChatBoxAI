@@ -233,23 +233,47 @@ bot.on('polling_error', (err) => console.error('❌ Polling error:', err.message
 //       BOT LOGIC
 // ======================
 
-// Phân trang
+// Phân trang - 1 hàng 5 ô: Đầu - Số trang - Cuối
 function getPageNumberButtons(currentPage, totalPages) {
-  const startPage = Math.max(1, currentPage - 2);
-  const endPage = Math.min(totalPages, currentPage + 2);
   const buttons = [];
+
+  // Nút Trang đầu
+  buttons.push({
+    text: '⏪',
+    callback_data: currentPage === 1 ? 'noop:first' : 'list_page:1'
+  });
+
+  // Tính 3 số trang ở giữa
+  let startPage = Math.max(1, currentPage - 1);
+  let endPage = Math.min(totalPages, currentPage + 1);
+
+  // Điều chỉnh để luôn có 3 số nếu có thể
+  if (endPage - startPage < 2) {
+    if (startPage === 1) {
+      endPage = Math.min(totalPages, 3);
+    } else if (endPage === totalPages) {
+      startPage = Math.max(1, totalPages - 2);
+    }
+  }
 
   for (let p = startPage; p <= endPage; p++) {
     if (p === currentPage) {
-      buttons.push({ text: `【${p}】` });
+      buttons.push({ text: `【${p}】`, callback_data: 'noop' }); // Trang hiện tại không bấm được
     } else {
       buttons.push({ text: `${p}`, callback_data: `list_page:${p}` });
     }
   }
-  return buttons;
+
+  // Nút Trang cuối
+  buttons.push({
+    text: '⏩',
+    callback_data: currentPage === totalPages ? 'noop:last' : `list_page:${totalPages}`
+  });
+
+  return [buttons];   // Trả về 1 hàng chứa 5 nút
 }
 
-// Generate danh sách truyện - ĐÃ XÓA TẠM THỜI PHẦN PHÂN TRANG
+// Generate danh sách truyện - ĐÃ FIX CHẮC CHẮN
 async function generateListPage(page = 1, chatId = null) {
   try {
     let books = await getBooks();
@@ -294,8 +318,11 @@ async function generateListPage(page = 1, chatId = null) {
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
     text += `Ví dụ: \`1 3 5\`\nHoặc gõ \`full\` để mua toàn bộ truyện!`;
 
-    // === TẠM THỜI XÓA TOÀN BỘ PHẦN NÚT PHÂN TRANG ===
-    const inlineKeyboard = [];
+   // Nút phân trang
+    let inlineKeyboard = [];
+    if (totalPages > 1) {
+      inlineKeyboard = getPageNumberButtons(page, totalPages);
+    }
 
     return { text, inlineKeyboard };
   } catch (err) {
