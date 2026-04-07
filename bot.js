@@ -249,14 +249,10 @@ function getPageNumberButtons(currentPage, totalPages) {
   return buttons;
 }
 
-// PHIÊN BẢN ĐÃ GIỚI HẠN NỘI DUNG - TỐI ƯU ĐỘ DÀI TEXT
+// Generate danh sách truyện - ĐÃ FIX CHẮC CHẮN
 async function generateListPage(page = 1, chatId = null) {
   try {
-    console.log(`[DEBUG] generateListPage bắt đầu - page: ${page}`);
-
     let books = await getBooks();
-    console.log(`[DEBUG] getBooks trả về ${books.length} truyện`);
-
     if (books.length === 0) {
       return { 
         text: 'Hiện chưa có truyện nào trong database 😢.', 
@@ -265,9 +261,9 @@ async function generateListPage(page = 1, chatId = null) {
     }
 
     books.sort((a, b) => b.id - a.id);
-
     const ITEMS_PER_MESSAGE = 3;
     const totalPages = Math.ceil(books.length / ITEMS_PER_MESSAGE);
+    
     if (page < 1) page = 1;
     if (page > totalPages) page = totalPages;
 
@@ -276,48 +272,57 @@ async function generateListPage(page = 1, chatId = null) {
 
     let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
 
-    chunk.forEach((b) => {
-      // Giới hạn nội dung chỉ còn 50 ký tự
-      let desc = b.description ? b.description.trim() : '';
-      if (desc.length > 50) {
-        desc = desc.substring(0, 47) + '...';
+    // Kiểm tra VIP an toàn
+    if (chatId) {
+      const isVIP = await isUserVIP(chatId);
+      if (isVIP) {
+        text += `🎟️ BẠN ĐANG LÀ VIP MEMBER → Giảm thêm 50% trên mọi đơn hàng\n\n`;
+      } else {
+        text += `💎 Chưa là VIP? Giảm 50% hóa đơn vĩnh viễn chỉ với 139k → Gõ /start để mua\n\n`;
       }
+    }
 
+    chunk.forEach(b => {
       text += `-----------------------------\n\n`;
-      text += `${b.id}. ${b.name || 'Không tên'}\n`;
-      text += `   📖 Số chương: ${b.chapters || 0}\n`;
-      text += `   📏 Độ dài: ${b.chapterLength || 'N/A'}\n`;
-      text += `   🎭 Thể loại: ${b.genres ? b.genres.join(", ") : 'Không có'}\n`;
-      text += `   📝 Nội dung: ${desc}\n`;
-      text += `   💰 Giá: ${b.free ? "Free" : (b.price || 0).toLocaleString('vi-VN') + "đ"}\n\n`;
+      text += `${b.id}. ${b.name}\n`;
+      text += `   📖 Số chương: ${b.chapters}\n`;
+      text += `   📏 Độ dài: ${b.chapterLength}\n`;
+      text += `   🎭 Thể loại: ${b.genres.join(", ")}\n`;
+
+      // ========== GIỚI HẠN NỘI DUNG 90 KÝ TỰ ==========
+      let description = b.description ? String(b.description).trim() : '';
+      if (description.length > 90) {
+        description = description.substring(0, 87) + '...';
+      }
+      text += `   📝 Nội dung: ${description}\n`;
+      
+      text += `   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
     });
 
-    text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách).\n`;
-    text += `Ví dụ: \`1 3 5\` hoặc gõ \`full\` để mua toàn bộ!`;
+    text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
+    text += `Ví dụ: \`1 3 5\`\nHoặc gõ \`full\` để mua toàn bộ truyện!`;
 
-    // Inline keyboard giữ nguyên phiên bản đơn giản
-    const inlineKeyboard = [
-      [
-        { text: '⏪ Đầu', callback_data: 'list_page:1' },
-        { text: '◀️ Trước', callback_data: page > 1 ? `list_page:${page - 1}` : 'noop' }
-      ],
-      [
-        { text: `Trang ${page}/${totalPages}`, callback_data: 'noop' }
-      ],
-      [
-        { text: '▶️ Sau', callback_data: page < totalPages ? `list_page:${page + 1}` : 'noop' },
-        { text: 'Cuối ⏩', callback_data: `list_page:${totalPages}` }
-      ]
+    const inlineKeyboard = [];
+
+    const topRow = [
+      { text: '⏪ Trang đầu', callback_data: page === 1 ? 'noop:first' : 'list_page:1' },
+      { text: '◀️ Trang trước', callback_data: page > 1 ? `list_page:${page - 1}` : 'noop:first' }
     ];
+    inlineKeyboard.push(topRow);
 
-    console.log(`[DEBUG] generateListPage hoàn thành - text dài ${text.length} ký tự`);
+    inlineKeyboard.push(getPageNumberButtons(page, totalPages));
+
+    const bottomRow = [
+      { text: '▶️ Trang sau', callback_data: page < totalPages ? `list_page:${page + 1}` : 'noop:last' },
+      { text: 'Trang cuối ⏩', callback_data: page === totalPages ? 'noop:last' : `list_page:${totalPages}` }
+    ];
+    inlineKeyboard.push(bottomRow);
 
     return { text, inlineKeyboard };
-
   } catch (err) {
-    console.error("❌ Lỗi generateListPage:", err.message, err.stack);
+    console.error("❌ Lỗi generateListPage:", err.message);
     return { 
-      text: 'Lỗi khi tải danh sách truyện.\n\nVui lòng thử lại sau.', 
+      text: 'Có lỗi khi tải danh sách truyện 😵.\n\nVui lòng thử lại sau hoặc nhắn @ea7bpp hỗ trợ.', 
       inlineKeyboard: [] 
     };
   }
