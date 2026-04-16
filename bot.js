@@ -201,7 +201,9 @@ app.post("/sepay", async (req, res) => {
   }
 
   order.paid = true;
-  console.log(`✅ Thanh toán OK đơn ${orderId}`);
+ // ====================== LOG CHÍNH THỨC ======================
+  const userInfo = `${order.username || 'Không có username'} | ChatID: ${order.chatId}`;
+  console.log(`✅ THANH TOÁN THÀNH CÔNG | Order: ${orderId} | User: ${userInfo} | Số tiền: ${amount.toLocaleString('vi-VN')}đ`);
 
   try {
     if (order.isVIP) {
@@ -209,21 +211,24 @@ app.post("/sepay", async (req, res) => {
       await bot.sendMessage(order.chatId, 
         `🎉 THANH TOÁN VIP THÀNH CÔNG!\n\n` +
         `💎 Bạn đã trở thành VIP Member.\n` +
-        `Từ nay mọi lần mua truyện sẽ được giảm thêm 50% (sau ưu đãi cũ).\n\n` +
+        `Từ nay mọi lần mua truyện sẽ được giảm thêm 50%.\n\n` +
         `Cảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`
       );
+      console.log(`✅ ĐÃ CẤP VIP cho ${userInfo}`);
     } else {
       const bookIds = order.books.map(b => b.id);
       await incrementSoldQuantity(bookIds);
       await sendBookLinks(order.chatId, order.books, false);
+      console.log(`✅ ĐÃ GỬI LINK TRUYỆN cho ${userInfo}`);
     }
   } catch (err) {
-    console.error(`❌ LỖI XỬ LÝ ĐƠN ${orderId}:`, err.message);
+    console.error(`❌ LỖI XỬ LÝ ĐƠN ${orderId} | User: ${userInfo} | Error:`, err.message);
+    
     if (order.chatId) {
       await bot.sendMessage(order.chatId, 
-        `✅ Thanh toán OK nhưng có lỗi hệ thống.\n` +
-        `Nhắn @ea7bpp kèm mã đơn ${orderId} để hỗ trợ ngay!`
-      );
+        `✅ Thanh toán đã thành công nhưng có lỗi hệ thống.\n` +
+        `Nhắn @ea7bpp kèm mã đơn \`${orderId}\` để được hỗ trợ ngay!`
+      ).catch(() => {});
     }
   }
 
@@ -432,8 +437,14 @@ bot.on('callback_query', async (callbackQuery) => {
       const vipPrice = 139000;
       const orderId = createOrderId();
 
+// === THÊM USERNAME ĐỂ LOG SAU NÀY ===
+      const username = callbackQuery.from.username 
+        ? `@${callbackQuery.from.username}` 
+        : callbackQuery.from.first_name || 'Không có username';
+
       orders[orderId] = {
         chatId: chatId,
+        username: username,
         isVIP: true,
         amount: vipPrice,
         paid: false
@@ -455,7 +466,7 @@ bot.on('callback_query', async (callbackQuery) => {
         parse_mode: 'Markdown' 
       });
 
-      console.log(`✅ Đã gửi QR VIP cho ${chatId} - Order: ${orderId}`);
+      console.log(`📋 TẠO ĐƠN VIP | Order: ${orderId} | User: ${username} | ChatID: ${chatId}`);
     } catch (err) {
       console.error('❌ LỖI BUY VIP:', err.message);
       await bot.sendMessage(chatId, 
@@ -558,14 +569,23 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // Tạo đơn hàng
+// Tạo đơn hàng
   let orderId = createOrderId();
+
+  // === THÊM USERNAME ĐỂ LOG SAU NÀY ===
+  const username = msg.from.username 
+    ? `@${msg.from.username}` 
+    : msg.from.first_name || 'Không có username';
+
   orders[orderId] = {
     chatId: msg.chat.id,
+    username: username,
     books: selected,
     amount: final,
     paid: false
   };
+
+  console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${final.toLocaleString('vi-VN')}đ`);
 
   let content = orderId;
   let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
