@@ -7,6 +7,24 @@ const bodyParser = require("body-parser");
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: false });
 
+
+
+// ======================
+//   GLOBAL ERROR HANDLER (RẤT QUAN TRỌNG)
+// ======================
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ UNHANDLED REJECTION:', reason);
+  // Không crash server nữa
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', err);
+  // Có thể restart tự động nếu dùng PM2
+});
+
+
+
+
 // Kết nối Neon PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -402,35 +420,49 @@ bot.on('callback_query', async (callbackQuery) => {
 
   await bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
 
+  // ==================== BUY VIP ====================
   if (data === 'buy_vip') {
-    const alreadyVIP = await isUserVIP(chatId);
-    if (alreadyVIP) {
-      await bot.sendMessage(chatId, '🎟️ Bạn đã là VIP Member rồi! Không cần mua lại nhé.');
-      return;
+    try {
+      const alreadyVIP = await isUserVIP(chatId);
+      if (alreadyVIP) {
+        await bot.sendMessage(chatId, '🎟️ Bạn đã là VIP Member rồi! Không cần mua lại nhé.');
+        return;
+      }
+
+      const vipPrice = 139000;
+      const orderId = createOrderId();
+
+      orders[orderId] = {
+        chatId: chatId,
+        isVIP: true,
+        amount: vipPrice,
+        paid: false
+      };
+
+      const content = orderId;
+      const qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${vipPrice}&addInfo=${content}`;
+
+      const caption = `💎 MUA VIP MEMBER - 139.000đ\n\n` +
+        `Sau khi thanh toán bạn sẽ được:\n` +
+        `• Giảm 50% hóa đơn vĩnh viễn khi mua truyện\n\n` +
+        `🧾 Mã đơn hàng: \`${orderId}\`\n` +
+        `📝 Nội dung chuyển khoản: \`${content}\`\n\n` +
+        `Quét mã QR hoặc chuyển khoản MB Bank 0550767799967\n` +
+        `Bot sẽ tự động xác nhận ngay khi nhận tiền!`;
+
+      await bot.sendPhoto(chatId, qrLink, { 
+        caption, 
+        parse_mode: 'Markdown' 
+      });
+
+      console.log(`✅ Đã gửi QR VIP cho ${chatId} - Order: ${orderId}`);
+    } catch (err) {
+      console.error('❌ LỖI BUY VIP:', err.message);
+      await bot.sendMessage(chatId, 
+        `❌ Có lỗi khi tạo đơn VIP.\n` +
+        `Vui lòng thử lại hoặc nhắn @ea7bpp kèm lỗi này để mình fix ngay!`
+      ).catch(() => {});
     }
-
-    const vipPrice = 139000;
-    const orderId = createOrderId();
-
-    orders[orderId] = {
-      chatId: chatId,
-      isVIP: true,
-      amount: vipPrice,
-      paid: false
-    };
-
-    const content = orderId;
-    const qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${vipPrice}&addInfo=${content}`;
-
-    const caption = `💎 MUA VIP MEMBER - 139.000đ\n\n` +
-      `Sau khi thanh toán bạn sẽ được:\n` +
-      `• Giảm 50% hóa đơn vĩnh viễn khi mua truyện\n\n` +
-      `🧾 Mã đơn hàng: \`${orderId}\`\n` +
-      `📝 Nội dung chuyển khoản: \`${content}\`\n\n` +
-      `Quét mã QR hoặc chuyển khoản MB Bank 0550767799967\n` +
-      `Bot sẽ tự động xác nhận ngay khi nhận tiền!`;
-
-    await bot.sendPhoto(chatId, qrLink, { caption, parse_mode: 'Markdown' });
     return;
   }
 
