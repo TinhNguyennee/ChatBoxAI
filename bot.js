@@ -79,7 +79,7 @@ async function incrementSoldQuantity(bookIds) {
       'UPDATE books SET sold_quantity = COALESCE(sold_quantity, 0) + 1 WHERE id = ANY($1)',
       [bookIds]
     );
-    console.log(`📈 Đã +1 sold_quantity cho ${bookIds.length} truyện`);
+    console.log(`📈 Đã +1 sold_quantity cho ${bookIds.length} truyện (IDs: ${bookIds.join(', ')})`);
   } catch (err) {
     console.error('❌ Lỗi update sold_quantity:', err.message);
   }
