@@ -386,7 +386,7 @@ async function generateListPage(page = 1, chatId = null) {
     // Hiển thị banner event nếu active (ẩn nếu FALSE)
     const activeEvent = await getActiveEvent();
     if (activeEvent && activeEvent.content) {
-      text += `🎉 ${activeEvent.content}\n💥 Giảm thêm ${activeEvent.percent}% cho tất cả đơn hàng!\n\n`;
+      text += `${activeEvent.content}\n💥 Giảm thêm ${activeEvent.percent}% cho tất cả đơn hàng!\n\n`;
     }
 
     chunk.forEach(b => {
@@ -577,7 +577,9 @@ bot.on("message", async (msg) => {
     if (isVIP) {
       freeMsg += `💎 Bạn là VIP Member, không cần phải vượt link đâu nhé! Link sẽ được gửi ngay cho bạn.\nCảm ơn bạn đã luôn ủng hộ Truyện Ếch Xanh! 🔥`;
     } else {
-      freeMsg += `📌 Các bạn chịu khó vượt link giúp mình nha! Mình rất cảm ơn sự ủng hộ nhiệt tình của các bạn.\nLink sẽ được gửi ngay cho bạn! ❤️`;
+      freeMsg += `📌 Các bạn chịu khó vượt link giúp mình nha! Mình rất cảm ơn sự ủng hộ nhiệt tình của các bạn.\nLink sẽ được gửi ngay cho bạn! ❤️\n\n`;
+      freeMsg += `🎬 Đây là video hướng dẫn cách vượt link trên điện thoại\n`;
+      freeMsg += `https://docs.google.com/videos/d/1vC_zj2iqhIcrNkZWTY5CBQTghbi5ykQZQ_1XP19l4lM/edit?usp=sharing`;
     }
     await bot.sendMessage(msg.chat.id, freeMsg);
     const freeBookIds = selected.filter(b => b.free).map(b => b.id);
