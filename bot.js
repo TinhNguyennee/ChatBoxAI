@@ -8,21 +8,16 @@ const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: false });
 
 
-
 // ======================
 //   GLOBAL ERROR HANDLER (RẤT QUAN TRỌNG)
 // ======================
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ UNHANDLED REJECTION:', reason);
-  // Không crash server nữa
 });
 
 process.on('uncaughtException', (err) => {
   console.error('❌ UNCAUGHT EXCEPTION:', err);
-  // Có thể restart tự động nếu dùng PM2
 });
-
-
 
 
 // Kết nối Neon PostgreSQL
@@ -44,77 +39,95 @@ function createOrderId() {
 }
 
 // ======================
-//   CÁC HÀM VIP + SOLD QUANTITY (ĐÃ FIX)
+//   CÁC HÀM MỚI - NÂNG CẤP
 // ======================
 
-// Kiểm tra user có phải VIP không - ĐÃ FIX AN TOÀN
-async function isUserVIP(chatId) {
-  if (!chatId) return false;
+// Tính giảm giá theo hóa đơn (mua nhiều) - MỚI
+function calculateMultiDiscount(total) {
+  if (total < 50000) return 0;
+  
+  let percent = 5; // Bắt đầu từ 50k = 5%
+  const extra = Math.floor((total - 50000) / 10000);
+  percent += extra;
+  
+  if (percent > 39) percent = 39; // Tối đa 39%
+  
+  return Math.floor(total * percent / 100);
+}
 
+// Lấy % giảm giá sự kiện hiện tại (nếu có)
+async function getActiveEventDiscountPercent() {
   try {
     const res = await pool.query(
-      'SELECT 1 FROM vip WHERE telegram_id = $1 LIMIT 1', 
-      [chatId.toString()]
+      'SELECT percent FROM discount_events WHERE active = true LIMIT 1'
     );
-    return res.rowCount > 0;
+    return res.rows.length > 0 ? parseInt(res.rows[0].percent) || 0 : 0;
   } catch (err) {
-    console.error('❌ Lỗi check VIP:', err.message);
-    return false;
+    console.error('❌ Lỗi lấy event discount:', err.message);
+    return 0;
   }
 }
 
-// Thêm user vào bảng VIP
-async function addToVIP(chatId) {
-  if (!chatId) return;
-  try {
-    await pool.query(
-      'INSERT INTO vip (telegram_id) VALUES ($1) ON CONFLICT (telegram_id) DO NOTHING',
-      [chatId.toString()]
-    );
-    console.log(`✅ Đã cấp VIP cho Telegram ID: ${chatId}`);
-  } catch (err) {
-    console.error('❌ Lỗi thêm VIP:', err.message);
+// Tính giá cuối cùng (LOGIC MỚI HOÀN TOÀN)
+async function calculateFinalPrice(selected, isVIP, isFullPurchase) {
+  const paidBooks = selected.filter(b => !b.free);
+  const total = paidBooks.reduce((s, b) => s + b.price, 0);
+  const count = paidBooks.length;
+
+  let final = 0;
+  let discountBreakdown = [];
+
+  if (isFullPurchase) {
+    // === MUA FULL ===
+    final = 309000;
+    
+    if (isVIP) {
+      final = 309000 - 120000; // Giảm thẳng 120k cho VIP
+      discountBreakdown.push(`💎 VIP giảm 120k: -120.000đ`);
+    } else {
+      discountBreakdown.push(`🎁 Tặng VIP vĩnh viễn khi thanh toán!`);
+    }
+  } else {
+    // === MUA LẺ / MUA NHIỀU ===
+    // 1. Giảm theo hóa đơn (ưu tiên cao nhất)
+    const multiDiscount = calculateMultiDiscount(total);
+    let afterMulti = total - multiDiscount;
+    
+    if (multiDiscount > 0) {
+      const multiPercent = Math.round((multiDiscount / total) * 100);
+      discountBreakdown.push(`🎁 Giảm mua nhiều ${multiPercent}%: -${multiDiscount.toLocaleString('vi-VN')}đ`);
+    }
+
+    // 2. Giảm VIP 50%
+    let afterVIP = afterMulti;
+    if (isVIP && afterMulti > 0) {
+      const vipDiscount = Math.floor(afterMulti / 2);
+      afterVIP = afterMulti - vipDiscount;
+      discountBreakdown.push(`💎 Giảm VIP 50%: -${vipDiscount.toLocaleString('vi-VN')}đ`);
+    }
+
+    // 3. Giảm sự kiện (ưu tiên cuối cùng)
+    const eventPercent = await getActiveEventDiscountPercent();
+    let finalAfterEvent = afterVIP;
+    
+    if (eventPercent > 0 && afterVIP > 0) {
+      const eventDiscount = Math.floor(afterVIP * eventPercent / 100);
+      finalAfterEvent = afterVIP - eventDiscount;
+      discountBreakdown.push(`🎉 Giảm sự kiện ${eventPercent}%: -${eventDiscount.toLocaleString('vi-VN')}đ`);
+    }
+
+    final = finalAfterEvent;
   }
+
+  return {
+    finalAmount: Math.max(0, final),
+    discountBreakdown,
+    totalOriginal: total
+  };
 }
 
-// Tăng sold_quantity
-async function incrementSoldQuantity(bookIds) {
-  if (!bookIds || bookIds.length === 0) return;
-
-  try {
-    await pool.query(
-      'UPDATE books SET sold_quantity = COALESCE(sold_quantity, 0) + 1 WHERE id = ANY($1)',
-      [bookIds]
-    );
-    console.log(`📈 Đã +1 sold_quantity cho ${bookIds.length} truyện (ID: ${bookIds.join(', ')})`);
-  } catch (err) {
-    console.error('❌ Lỗi update sold_quantity:', err.message);
-  }
-}
-
-// Lấy danh sách truyện
-async function getBooks() {
-  try {
-    const res = await pool.query('SELECT * FROM books ORDER BY id ASC');
-    return res.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      chapters: row.chapters,
-      chapterLength: row.chapterlength,
-      description: row.description,
-      free: row.free,
-      price: row.price,
-      link: row.link || '',
-      genres: row.genres ? row.genres.split(', ') : []
-    }));
-  } catch (err) {
-    console.error('❌ Lỗi query books:', err.message);
-    return [];
-  }
-}
-
-// Gửi link theo chunk
-async function sendBookLinks(chatId, books, isFree = false) {
+// Gửi link theo chunk - ĐÃ NÂNG CẤP HỖ TRỢ link_free
+async function sendBookLinks(chatId, books, isFree = false, isVIP = false) {
   if (!chatId || !books || books.length === 0) return;
 
   const ITEMS_PER_PART = 3;
@@ -126,10 +139,17 @@ async function sendBookLinks(chatId, books, isFree = false) {
 
     const chunkLinks = chunk
       .map((b) => {
-        let linkStr = (b.link || '').trim();
-        if (!linkStr) return `${b.id}. ${b.name}\n(LINK KHÔNG CÓ)`;
+        // === LOGIC MỚI: Chọn link ===
+        let linkToUse = b.link || '';
         
-        let linkParts = linkStr.split(', ').map(p => p.trim());
+        // Chỉ dùng link_free khi là đơn miễn phí VÀ user KHÔNG phải VIP
+        if (isFree && !isVIP && b.link_free) {
+          linkToUse = b.link_free;
+        }
+        
+        if (!linkToUse) return `${b.id}. ${b.name}\n(LINK KHÔNG CÓ)`;
+        
+        let linkParts = linkToUse.split(', ').map(p => p.trim());
         let linksDisplay = linkParts
           .map((part, j) => {
             if (part.includes('(Part')) return part;
@@ -173,7 +193,7 @@ async function sendBookLinks(chatId, books, isFree = false) {
 }
 
 // ======================
-//       WEBHOOK
+//       WEBHOOK (GIỮ NGUYÊN)
 // ======================
 
 app.post("/sepay", async (req, res) => {
@@ -201,7 +221,7 @@ app.post("/sepay", async (req, res) => {
   }
 
   order.paid = true;
- // ====================== LOG CHÍNH THỨC ======================
+
   const userInfo = `${order.username || 'Không có username'} | ChatID: ${order.chatId}`;
   console.log(`✅ THANH TOÁN THÀNH CÔNG | Order: ${orderId} | User: ${userInfo} | Số tiền: ${amount.toLocaleString('vi-VN')}đ`);
 
@@ -218,7 +238,10 @@ app.post("/sepay", async (req, res) => {
     } else {
       const bookIds = order.books.map(b => b.id);
       await incrementSoldQuantity(bookIds);
-      await sendBookLinks(order.chatId, order.books, false);
+      
+      // === GỬI LINK VỚI isVIP ===
+      const isVIPUser = await isUserVIP(order.chatId);
+      await sendBookLinks(order.chatId, order.books, false, isVIPUser);
       console.log(`✅ ĐÃ GỬI LINK TRUYỆN cho ${userInfo}`);
     }
   } catch (err) {
@@ -247,30 +270,26 @@ bot.setWebHook(`${url}/bot${token}`)
   .catch(err => console.error('❌ Lỗi set webhook Telegram:', err.message));
 
 // ======================
-//   GLOBAL ERROR HANDLER (RẤT QUAN TRỌNG)
+//   GLOBAL ERROR HANDLER
 // ======================
 bot.on('error', (err) => console.error('❌ Bot error:', err.message));
 bot.on('polling_error', (err) => console.error('❌ Polling error:', err.message));
 
 // ======================
-//       BOT LOGIC
+//       BOT LOGIC (GIỮ NGUYÊN PHẦN PHÂN TRANG)
 // ======================
 
-// Phân trang - 1 hàng 5 ô: Đầu - Số trang - Cuối
 function getPageNumberButtons(currentPage, totalPages) {
   const buttons = [];
 
-  // Nút Trang đầu
   buttons.push({
     text: '⏪',
     callback_data: currentPage === 1 ? 'noop:first' : 'list_page:1'
   });
 
-  // Tính 3 số trang ở giữa
   let startPage = Math.max(1, currentPage - 1);
   let endPage = Math.min(totalPages, currentPage + 1);
 
-  // Điều chỉnh để luôn có 3 số nếu có thể
   if (endPage - startPage < 2) {
     if (startPage === 1) {
       endPage = Math.min(totalPages, 3);
@@ -281,22 +300,20 @@ function getPageNumberButtons(currentPage, totalPages) {
 
   for (let p = startPage; p <= endPage; p++) {
     if (p === currentPage) {
-      buttons.push({ text: `【${p}】`, callback_data: 'noop' }); // Trang hiện tại không bấm được
+      buttons.push({ text: `【${p}】`, callback_data: 'noop' });
     } else {
       buttons.push({ text: `${p}`, callback_data: `list_page:${p}` });
     }
   }
 
-  // Nút Trang cuối
   buttons.push({
     text: '⏩',
     callback_data: currentPage === totalPages ? 'noop:last' : `list_page:${totalPages}`
   });
 
-  return [buttons];   // Trả về 1 hàng chứa 5 nút
+  return [buttons];
 }
 
-// Generate danh sách truyện - ĐÃ FIX CHẮC CHẮN
 async function generateListPage(page = 1, chatId = null) {
   try {
     let books = await getBooks();
@@ -318,13 +335,14 @@ async function generateListPage(page = 1, chatId = null) {
 
     let text = `📚 Danh sách truyện (Trang ${page}/${totalPages})\n\n`;
 
-    // Kiểm tra VIP an toàn
     if (chatId) {
       const isVIP = await isUserVIP(chatId);
       if (isVIP) {
-        text += `🎟️ BẠN ĐANG LÀ VIP MEMBER → Giảm thêm 50% trên mọi đơn hàng\n\n`;
+        text += `🎟️ BẠN ĐANG LÀ VIP MEMBER → Giảm 50% vĩnh viễn + ưu đãi mua nhiều\n\n`;
       } else {
-        text += `💎 Chưa là VIP? Giảm 50% hóa đơn vĩnh viễn chỉ với 139k → Gõ /start để mua\n\n`;
+        text += `💎 VIP Member - Chỉ 139.000đ (một lần mua):\n`;
+        text += `• Giảm 50% vĩnh viễn trên mọi đơn hàng\n`;
+        text += `• Mua Full chỉ 309k (tặng VIP)\n\n`;
       }
     }
 
@@ -341,7 +359,6 @@ async function generateListPage(page = 1, chatId = null) {
     text += `✍ Nhập số tương ứng với truyện bạn muốn mua (cách nhau bằng dấu cách nếu mua nhiều).\n`;
     text += `Ví dụ: \`1 3 5\`\nHoặc gõ \`full\` để mua toàn bộ truyện!`;
 
-   // Nút phân trang
     let inlineKeyboard = [];
     if (totalPages > 1) {
       inlineKeyboard = getPageNumberButtons(page, totalPages);
@@ -358,7 +375,7 @@ async function generateListPage(page = 1, chatId = null) {
 }
 
 // ======================
-//   START COMMAND
+//   START COMMAND (ĐÃ CẬP NHẬT TEXT)
 // ======================
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
@@ -368,18 +385,17 @@ bot.onText(/\/start/, async (msg) => {
 
   if (isVIP) {
     welcomeText += `🎟️ BẠN ĐANG LÀ VIP MEMBER\n`;
-    welcomeText += `💎 Được giảm 50% vĩnh viễn trên mọi lần mua truyện\n\n`;
-    welcomeText += `Bạn có thể mua truyện ngay với giá siêu ưu đãi!\n\n`;
+    welcomeText += `💎 Giảm 50% vĩnh viễn + ưu đãi mua nhiều theo %\n`;
+    welcomeText += `🎁 Mua Full chỉ còn 189k (giảm thẳng 120k)\n\n`;
   } else {
     welcomeText += `💎 VIP Member - Chỉ 139.000đ (một lần mua):\n`;
-    welcomeText += `• Giảm ngay 50% trên tổng hóa đơn (sau ưu đãi mua nhiều/full)\n`;
-    welcomeText += `• Áp dụng vĩnh viễn cho mọi lần mua sau\n\n`;
+    welcomeText += `• Giảm 50% vĩnh viễn trên mọi đơn hàng\n`;
+    welcomeText += `• Mua Full chỉ 309k (tặng VIP vĩnh viễn)\n\n`;
   }
 
-  welcomeText += `Ưu đãi mua nhiều vẫn áp dụng bình thường:\n`;
-  welcomeText += `• Từ bộ thứ 3 giảm 20k\n`;
-  welcomeText += `• Từ bộ thứ 4 giảm thêm 10k/bộ\n`;
-  welcomeText += `• Mua FULL giảm thêm 5k/truyện\n\n`;
+  welcomeText += `Ưu đãi mua nhiều MỚI (giảm theo % hóa đơn):\n`;
+  welcomeText += `• Từ 50k → giảm 5%, cứ +10k thêm 1%\n`;
+  welcomeText += `• Tối đa 39%\n\n`;
 
   welcomeText += `Chọn ngay bên dưới nhé! 🔥`;
 
@@ -418,14 +434,13 @@ bot.onText(/\/id/, async (msg) => {
   await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
 });
 
-// Callback Query
+// Callback Query (GIỮ NGUYÊN)
 bot.on('callback_query', async (callbackQuery) => {
   const data = callbackQuery.data;
   const chatId = callbackQuery.message.chat.id;
 
   await bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
 
-  // ==================== BUY VIP ====================
   if (data === 'buy_vip') {
     try {
       const alreadyVIP = await isUserVIP(chatId);
@@ -437,7 +452,6 @@ bot.on('callback_query', async (callbackQuery) => {
       const vipPrice = 139000;
       const orderId = createOrderId();
 
-// === THÊM USERNAME ĐỂ LOG SAU NÀY ===
       const username = callbackQuery.from.username 
         ? `@${callbackQuery.from.username}` 
         : callbackQuery.from.first_name || 'Không có username';
@@ -455,7 +469,8 @@ bot.on('callback_query', async (callbackQuery) => {
 
       const caption = `💎 MUA VIP MEMBER - 139.000đ\n\n` +
         `Sau khi thanh toán bạn sẽ được:\n` +
-        `• Giảm 50% hóa đơn vĩnh viễn khi mua truyện\n\n` +
+        `• Giảm 50% vĩnh viễn trên mọi đơn hàng\n` +
+        `• Mua Full chỉ còn 189k (giảm thẳng 120k)\n\n` +
         `🧾 Mã đơn hàng: \`${orderId}\`\n` +
         `📝 Nội dung chuyển khoản: \`${content}\`\n\n` +
         `Quét mã QR hoặc chuyển khoản MB Bank 0550767799967\n` +
@@ -514,7 +529,9 @@ bot.on('callback_query', async (callbackQuery) => {
   }
 });
 
-// Xử lý tin nhắn chọn truyện
+// ======================
+//   XỬ LÝ TIN NHẮN CHỌN TRUYỆN (LOGIC MỚI)
+// ======================
 bot.on("message", async (msg) => {
   let text = msg.text;
   if (!text || text.startsWith('/')) return;
@@ -538,26 +555,13 @@ bot.on("message", async (msg) => {
     return bot.sendMessage(msg.chat.id, 'Không tìm thấy truyện nào với số bạn nhập 😕.');
   }
 
-  let paidBooks = selected.filter(b => !b.free);
-  let total = paidBooks.reduce((s, b) => s + b.price, 0);
-  let count = paidBooks.length;
-
-  let discount = 0;
-  if (count >= 3) discount += 20000;
-  if (count >= 4) discount += (count - 3) * 10000;
-  if (isFullPurchase && count > 0) discount += count * 5000;
-
   const isVIP = await isUserVIP(msg.chat.id);
-  let final = total - discount;
-  let vipDiscountText = '';
+  
+  // === TÍNH GIÁ MỚI ===
+  const { finalAmount, discountBreakdown, totalOriginal } = await calculateFinalPrice(selected, isVIP, isFullPurchase);
 
-  if (isVIP && final > 0) {
-    const afterOldDiscount = final;
-    final = Math.floor(afterOldDiscount / 2);
-    vipDiscountText = `💎 Giảm VIP 50%: -${(afterOldDiscount - final).toLocaleString('vi-VN')}đ\n`;
-  }
-
-  if (final <= 0 || paidBooks.length === 0) {
+  // Kiểm tra miễn phí
+  if (finalAmount <= 0 || selected.every(b => b.free)) {
     await bot.sendMessage(msg.chat.id, `🎉 Tất cả truyện bạn chọn đều miễn phí! Đang gửi link...`);
 
     const freeBookIds = selected.filter(b => b.free).map(b => b.id);
@@ -565,14 +569,13 @@ bot.on("message", async (msg) => {
       await incrementSoldQuantity(freeBookIds);
     }
 
-    await sendBookLinks(msg.chat.id, selected, true);
+    await sendBookLinks(msg.chat.id, selected, true, isVIP);
     return;
   }
 
-// Tạo đơn hàng
+  // Tạo đơn hàng
   let orderId = createOrderId();
 
-  // === THÊM USERNAME ĐỂ LOG SAU NÀY ===
   const username = msg.from.username 
     ? `@${msg.from.username}` 
     : msg.from.first_name || 'Không có username';
@@ -581,16 +584,16 @@ bot.on("message", async (msg) => {
     chatId: msg.chat.id,
     username: username,
     books: selected,
-    amount: final,
+    amount: finalAmount,
     paid: false
   };
 
-  console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${final.toLocaleString('vi-VN')}đ`);
+  console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ`);
 
   let content = orderId;
-  let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${final}&addInfo=${content}`;
+  let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${finalAmount}&addInfo=${content}`;
 
-  // Gửi giỏ hàng theo phần (giữ nguyên logic cũ)
+  // Gửi giỏ hàng theo phần
   const ITEMS_PER_PART = 3;
   const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
   let partNumber = 1;
@@ -604,15 +607,30 @@ bot.on("message", async (msg) => {
     captionPart += `Bạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n`;
 
     if (endIndex === selected.length) {
-      captionPart += `\n💰 Tổng tiền gốc: ${total.toLocaleString('vi-VN')}đ\n`;
-      captionPart += `🎁 Giảm giá thường: ${discount.toLocaleString('vi-VN')}đ\n`;
-      captionPart += vipDiscountText;
-      captionPart += `💳 Số tiền cần thanh toán: ${final.toLocaleString('vi-VN')}đ\n\n`;
+      captionPart += `\n💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
+      
+      discountBreakdown.forEach(line => {
+        captionPart += `${line}\n`;
+      });
+      
+      captionPart += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n\n`;
 
       captionPart += `🧾 Mã đơn hàng: ${orderId}\n`;
       captionPart += `📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
-      if (isFullPurchase) captionPart += `🎉 ĐÃ ÁP DỤNG ƯU ĐÃI MUA FULL!\n`;
-      if (isVIP) captionPart += `💎 Bạn đang là VIP - Đã giảm 50%!\n`;
+      
+      if (isFullPurchase) {
+        captionPart += `🎉 ĐÃ ÁP DỤNG GIÁ FULL 309K!\n`;
+        if (isVIP) {
+          captionPart += `💎 VIP được giảm thẳng 120k!\n`;
+        } else {
+          captionPart += `🎁 Tặng VIP vĩnh viễn!\n`;
+        }
+      }
+      
+      if (isVIP && !isFullPurchase) {
+        captionPart += `💎 Bạn đang là VIP - Đã giảm 50%!\n`;
+      }
+      
       captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
     }
 
