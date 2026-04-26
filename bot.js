@@ -598,7 +598,7 @@ bot.on("message", async (msg) => {
 
   // Log chi tiết truyện (chỉ cho đơn truyện, không log full)
   if (!isFullPurchase) {
-    const bookNames = selected.map(b => `${b.id}. ${b.name}`).join(' | ');
+    const bookNames = selected.map(b => `${b.id}`).join(' | ');
     console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ | Truyện: ${bookNames}`);
   } else {
     console.log(`📋 TẠO ĐƠN FULL | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ`);
