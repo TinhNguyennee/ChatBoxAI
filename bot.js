@@ -376,9 +376,10 @@ async function generateListPage(page = 1, chatId = null) {
     if (chatId) {
       const isVIP = await isUserVIP(chatId);
       if (isVIP) {
-        text += `🎟️ BẠN ĐANG LÀ VIP MEMBER → Giảm 50% vĩnh viễn + ưu đãi mua nhiều\n\n`;
+        text += `🎟️ BẠN ĐANG LÀ VIP MEMBER\n• Giảm 50% vĩnh viễn\n• Mua Full áp dụng giá 189k\n• Không cần vượt link các truyện Free\n\n`;
       } else {
-        text += `💎 VIP Member - Chỉ 139.000đ:\n• Giảm 50% vĩnh viễn\n• Mua Full chỉ 309k (tặng VIP)\n\n`;
+        text += `💎 VIP Member - Chỉ 139.000đ:\n• Giảm 50% vĩnh viễn\n• Không cần vượt link các truyện Free\n• Mua VIP Member ngay tại /start\n\n`;
+        text += `🛒 Mua Full truyện - chỉ 309.000đ:\n• Tặng VIP Member\n\n`;
       }
     }
 
@@ -419,7 +420,7 @@ bot.onText(/\/start/, async (msg) => {
     welcomeText += `💎 VIP Member - Chỉ 139.000đ (vĩnh viễn):\n• Giảm 50% tổng hóa đơn (Không áp dụng mua Full, mua Full sẽ được áp dụng giá khác)\n• Không cần phải vượt link cho các truyện Free\n\n🛒 Mua Full truyện - chỉ 309.000đ:\n• Tặng VIP Member\n\n`;
   }
 
-  welcomeText += `🛒 Ưu đãi mua truyện:\n• Hóa đơn mua truyện từ 50k → giảm 5%, cứ +10k thêm 1%\n• Tối đa 39%`;
+  welcomeText += `🎊 Ưu đãi mua truyện:\n• Hóa đơn mua truyện từ 50k → giảm 5%, cứ +10k thêm 1%\n• Tối đa 39%`;
 
   // Hiển thị banner event nếu active
   const activeEvent = await getActiveEvent();
