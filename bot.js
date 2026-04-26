@@ -134,7 +134,26 @@ async function getActiveEventDiscountPercent() {
   }
 }
 
-// Tính giá cuối cùng (LOGIC MỚI)
+// Lấy thông tin event active (content + percent) - MỚI cho banner
+async function getActiveEvent() {
+  try {
+    const res = await pool.query(
+      'SELECT content, percent FROM discount_events WHERE active = true LIMIT 1'
+    );
+    if (res.rows.length > 0) {
+      return {
+        content: res.rows[0].content || '',
+        percent: parseInt(res.rows[0].percent) || 0
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error('❌ Lỗi lấy active event:', err.message);
+    return null;
+  }
+}
+
+// Tính giá cuối cùng (LOGIC MỚI - ĐÃ CẬP NHẬT: event discount áp dụng cho cả Full & VIP)
 async function calculateFinalPrice(selected, isVIP, isFullPurchase) {
   const paidBooks = selected.filter(b => !b.free);
   const total = paidBooks.reduce((s, b) => s + b.price, 0);
@@ -143,13 +162,22 @@ async function calculateFinalPrice(selected, isVIP, isFullPurchase) {
   let final = 0;
   let discountBreakdown = [];
 
+  const eventPercent = await getActiveEventDiscountPercent();
+
   if (isFullPurchase) {
-    final = 309000;
+    let basePrice = 309000;
     if (isVIP) {
-      final = 309000 - 120000;
+      basePrice = 309000 - 120000;
       discountBreakdown.push(`💎 VIP giảm 120k: -120.000đ`);
     } else {
       discountBreakdown.push(`🎁 Tặng VIP vĩnh viễn khi thanh toán!`);
+    }
+
+    final = basePrice;
+    if (eventPercent > 0 && basePrice > 0) {
+      const eventDiscount = Math.floor(basePrice * eventPercent / 100);
+      final = basePrice - eventDiscount;
+      discountBreakdown.push(`🎉 Giảm sự kiện ${eventPercent}%: -${eventDiscount.toLocaleString('vi-VN')}đ`);
     }
   } else {
     const multiDiscount = calculateMultiDiscount(total);
@@ -167,7 +195,6 @@ async function calculateFinalPrice(selected, isVIP, isFullPurchase) {
       discountBreakdown.push(`💎 Giảm VIP 50%: -${vipDiscount.toLocaleString('vi-VN')}đ`);
     }
 
-    const eventPercent = await getActiveEventDiscountPercent();
     let finalAfterEvent = afterVIP;
     
     if (eventPercent > 0 && afterVIP > 0) {
@@ -355,6 +382,12 @@ async function generateListPage(page = 1, chatId = null) {
       }
     }
 
+    // Hiển thị banner event nếu active (ẩn nếu FALSE)
+    const activeEvent = await getActiveEvent();
+    if (activeEvent && activeEvent.content) {
+      text += `🎉 ${activeEvent.content}\n💥 Giảm thêm ${activeEvent.percent}% cho tất cả đơn hàng!\n\n`;
+    }
+
     chunk.forEach(b => {
       text += `-----------------------------\n\n${b.id}. ${b.name}\n   📖 Số chương: ${b.chapters}\n   📏 Độ dài: ${b.chapterLength}\n   🎭 Thể loại: ${b.genres.join(", ")}\n   📝 Nội dung: ${b.description}\n   💰 Giá: ${b.free ? "Free" : b.price.toLocaleString('vi-VN') + "đ"}\n\n`;
     });
@@ -386,7 +419,15 @@ bot.onText(/\/start/, async (msg) => {
     welcomeText += `💎 VIP Member - Chỉ 139.000đ (một lần mua):\n• Giảm 50% vĩnh viễn trên mọi đơn hàng\n• Mua Full chỉ 309k (tặng VIP vĩnh viễn)\n\n`;
   }
 
-  welcomeText += `Ưu đãi mua nhiều MỚI (giảm theo % hóa đơn):\n• Từ 50k → giảm 5%, cứ +10k thêm 1%\n• Tối đa 39%\n\nChọn ngay bên dưới nhé! 🔥`;
+  welcomeText += `Ưu đãi mua nhiều MỚI (giảm theo % hóa đơn):\n• Từ 50k → giảm 5%, cứ +10k thêm 1%\n• Tối đa 39%`;
+
+  // Hiển thị banner event nếu active
+  const activeEvent = await getActiveEvent();
+  if (activeEvent && activeEvent.content) {
+    welcomeText += `\n\n🎉 ${activeEvent.content}\n💥 Giảm thêm ${activeEvent.percent}% cho MỌI đơn hàng (kể cả VIP & Full)!`;
+  }
+
+  welcomeText += `\n\nChọn ngay bên dưới nhé! 🔥`;
 
   const keyboard = {
     inline_keyboard: [
@@ -434,7 +475,15 @@ bot.on('callback_query', async (callbackQuery) => {
         return;
       }
 
-      const vipPrice = 139000;
+      const eventPercent = await getActiveEventDiscountPercent();
+      let vipPrice = 139000;
+      let vipDiscountLines = [];
+      if (eventPercent > 0) {
+        const eventDiscount = Math.floor(vipPrice * eventPercent / 100);
+        vipPrice = vipPrice - eventDiscount;
+        vipDiscountLines.push(`🎉 Giảm sự kiện ${eventPercent}%: -${eventDiscount.toLocaleString('vi-VN')}đ`);
+      }
+
       const orderId = createOrderId();
       const username = callbackQuery.from.username ? `@${callbackQuery.from.username}` : callbackQuery.from.first_name || 'Không có username';
 
@@ -442,10 +491,17 @@ bot.on('callback_query', async (callbackQuery) => {
 
       const content = orderId;
       const qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${vipPrice}&addInfo=${content}`;
-      const caption = `💎 MUA VIP MEMBER - 139.000đ\n\nSau khi thanh toán bạn sẽ được:\n• Giảm 50% vĩnh viễn trên mọi đơn hàng\n• Mua Full chỉ còn 189k (giảm thẳng 120k)\n\n🧾 Mã đơn hàng: \`${orderId}\`\n📝 Nội dung chuyển khoản: \`${content}\`\n\nQuét mã QR hoặc chuyển khoản MB Bank 0550767799967\nBot sẽ tự động xác nhận ngay khi nhận tiền!`;
+
+      let caption = `💎 MUA VIP MEMBER`;
+      if (eventPercent > 0) caption += ` (ĐÃ GIẢM ${eventPercent}% LỄ)`;
+      caption += ` - ${vipPrice.toLocaleString('vi-VN')}đ\n\n`;
+      if (vipDiscountLines.length > 0) {
+        caption += vipDiscountLines.join('\n') + '\n\n';
+      }
+      caption += `Sau khi thanh toán bạn sẽ được:\n• Giảm 50% vĩnh viễn trên mọi đơn hàng\n• Mua Full chỉ còn 189k (giảm thẳng 120k)\n\n🧾 Mã đơn hàng: \`${orderId}\`\n📝 Nội dung chuyển khoản: \`${content}\`\n\nQuét mã QR hoặc chuyển khoản MB Bank 0550767799967\nBot sẽ tự động xác nhận ngay khi nhận tiền!`;
 
       await bot.sendPhoto(chatId, qrLink, { caption, parse_mode: 'Markdown' });
-      console.log(`📋 TẠO ĐƠN VIP | Order: ${orderId} | User: ${username} | ChatID: ${chatId}`);
+      console.log(`📋 TẠO ĐƠN VIP | Order: ${orderId} | User: ${username} | ChatID: ${chatId} | Giá: ${vipPrice.toLocaleString('vi-VN')}đ`);
     } catch (err) {
       console.error('❌ LỖI BUY VIP:', err.message);
       await bot.sendMessage(chatId, `❌ Có lỗi khi tạo đơn VIP.\nVui lòng thử lại hoặc nhắn @ea7bpp kèm lỗi này để mình fix ngay!`).catch(() => {});
@@ -516,7 +572,13 @@ bot.on("message", async (msg) => {
   const { finalAmount, discountBreakdown, totalOriginal } = await calculateFinalPrice(selected, isVIP, isFullPurchase);
 
   if (finalAmount <= 0 || selected.every(b => b.free)) {
-    await bot.sendMessage(msg.chat.id, `🎉 Tất cả truyện bạn chọn đều miễn phí! Đang gửi link...`);
+    let freeMsg = `🎉 TẤT CẢ TRUYỆN BẠN CHỌN ĐỀU MIỄN PHÍ!\n\n`;
+    if (isVIP) {
+      freeMsg += `💎 Vì bạn là VIP Member, không cần phải vượt link đâu nhé! Link sẽ được gửi ngay cho bạn.\nCảm ơn bạn đã luôn ủng hộ Truyện Ếch Xanh! 🔥`;
+    } else {
+      freeMsg += `📌 Các bạn chịu khó vượt link giúp mình nha! Mình rất cảm ơn sự ủng hộ nhiệt tình của các bạn.\nLink sẽ gửi ngay sau đây nhé! ❤️`;
+    }
+    await bot.sendMessage(msg.chat.id, freeMsg);
     const freeBookIds = selected.filter(b => b.free).map(b => b.id);
     if (freeBookIds.length > 0) await incrementSoldQuantity(freeBookIds);
     await sendBookLinks(msg.chat.id, selected, true, isVIP);
@@ -534,7 +596,13 @@ bot.on("message", async (msg) => {
     paid: false
   };
 
-  console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ`);
+  // Log chi tiết truyện (chỉ cho đơn truyện, không log full)
+  if (!isFullPurchase) {
+    const bookNames = selected.map(b => `${b.id}. ${b.name}`).join(' | ');
+    console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ | Truyện: ${bookNames}`);
+  } else {
+    console.log(`📋 TẠO ĐƠN FULL | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ`);
+  }
 
   let content = orderId;
   let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${finalAmount}&addInfo=${content}`;
