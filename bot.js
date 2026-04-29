@@ -111,16 +111,6 @@ async function getBooks() {
 //   CÁC HÀM MỚI - NÂNG CẤP
 // ======================
 
-// Tính giảm giá theo hóa đơn (mua nhiều) - MỚI
-function calculateMultiDiscount(total) {
-  if (total < 50000) return 0;
-  let percent = 5;
-  const extra = Math.floor((total - 50000) / 10000);
-  percent += extra;
-  if (percent > 39) percent = 39;
-  return Math.floor(total * percent / 100);
-}
-
 // Lấy % giảm giá sự kiện hiện tại
 async function getActiveEventDiscountPercent() {
   try {
@@ -153,7 +143,7 @@ async function getActiveEvent() {
   }
 }
 
-// Tính giá cuối cùng (CẬP NHẬT: ưu đãi cộng dồn % - tối đa 75%, không giảm từng tầng nữa)
+// Tính giá cuối cùng (LOGIC MỚI - ĐÃ CẬP NHẬT: event discount áp dụng cho cả Full & VIP)
 async function calculateFinalPrice(selected, isVIP, isFullPurchase) {
   const paidBooks = selected.filter(b => !b.free);
   const total = paidBooks.reduce((s, b) => s + b.price, 0);
@@ -180,35 +170,21 @@ async function calculateFinalPrice(selected, isVIP, isFullPurchase) {
       discountBreakdown.push(`🎉 Giảm sự kiện ${eventPercent}%: -${eventDiscount.toLocaleString('vi-VN')}đ`);
     }
   } else {
-    // CỘNG DỒN % GIẢM GIÁ - TỐI ĐA 75%
-    let multiPercent = 0;
+    let multiP = 0;
     if (total >= 50000) {
-      multiPercent = 5 + Math.floor((total - 50000) / 10000);
-      if (multiPercent > 75) multiPercent = 75;
+      multiP = 5 + Math.floor((total - 50000) / 10000);
+      if (multiP > 39) multiP = 39;
     }
-    const vipPercent = (isVIP && total > 0) ? 50 : 0;
-    let totalDiscountPercent = multiPercent + vipPercent + eventPercent;
-    if (totalDiscountPercent > 75) totalDiscountPercent = 75;
+    const vipP = isVIP ? 50 : 0;
+    let totP = multiP + vipP + eventPercent;
+    if (totP > 75) totP = 75;
 
-    const discountAmount = Math.floor(total * totalDiscountPercent / 100);
-    final = total - discountAmount;
+    final = Math.floor(total * (100 - totP) / 100);
 
-    // Breakdown (hiển thị từng % trên tổng gốc)
-    if (multiPercent > 0) {
-      const multiDiscount = Math.floor(total * multiPercent / 100);
-      discountBreakdown.push(`🎁 Giảm mua nhiều ${multiPercent}%: -${multiDiscount.toLocaleString('vi-VN')}đ`);
-    }
-    if (vipPercent > 0) {
-      const vipDiscount = Math.floor(total * vipPercent / 100);
-      discountBreakdown.push(`💎 Giảm VIP 50%: -${vipDiscount.toLocaleString('vi-VN')}đ`);
-    }
-    if (eventPercent > 0 && total > 0) {
-      const eventDiscount = Math.floor(total * eventPercent / 100);
-      discountBreakdown.push(`🎉 Giảm sự kiện ${eventPercent}%: -${eventDiscount.toLocaleString('vi-VN')}đ`);
-    }
-    if (totalDiscountPercent < (multiPercent + vipPercent + eventPercent)) {
-      discountBreakdown.push(`⚠️ Tổng giảm đã được giới hạn tối đa 75%`);
-    }
+    if (multiP > 0) discountBreakdown.push(`🎁 Giảm mua nhiều ${multiP}%`);
+    if (vipP > 0) discountBreakdown.push(`💎 Giảm VIP 50%`);
+    if (eventPercent > 0) discountBreakdown.push(`🎉 Giảm sự kiện ${eventPercent}%`);
+    if (totP > 0) discountBreakdown.push(`✅ Tổng ưu đãi của bạn: ${totP}%`);
   }
 
   return {
@@ -218,7 +194,7 @@ async function calculateFinalPrice(selected, isVIP, isFullPurchase) {
   };
 }
 
-// Gửi link theo chunk - LUÔN DÙNG link thường (đã bỏ link_free cho Free)
+// Gửi link theo chunk - HỖ TRỢ link_free
 async function sendBookLinks(chatId, books, isFree = false, isVIP = false) {
   if (!chatId || !books || books.length === 0) return;
 
@@ -232,7 +208,9 @@ async function sendBookLinks(chatId, books, isFree = false, isVIP = false) {
     const chunkLinks = chunk
       .map((b) => {
         let linkToUse = b.link || '';
-        // Đã bỏ phân biệt VIP/không VIP cho truyện Free: luôn gửi link thường (không dùng link_free nữa)
+        if (isFree && !isVIP && b.link_free) {
+          linkToUse = b.link_free;
+        }
         if (!linkToUse) return `${b.id}. ${b.name}\n(LINK KHÔNG CÓ)`;
         
         let linkParts = linkToUse.split(', ').map(p => p.trim());
@@ -300,15 +278,6 @@ app.post("/sepay", async (req, res) => {
         `🎉 THANH TOÁN VIP THÀNH CÔNG!\n\n💎 Bạn đã trở thành VIP Member.\nTừ nay mọi lần mua truyện sẽ được giảm thêm 50%.\n\nCảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`
       );
     } else {
-      if (order.isFull) {
-        const alreadyVIP = await isUserVIP(order.chatId);
-        if (!alreadyVIP) {
-          await addToVIP(order.chatId);
-          await bot.sendMessage(order.chatId, 
-            `🎉 THANH TOÁN MUA FULL THÀNH CÔNG!\n💎 Bạn đã được tặng VIP Member vĩnh viễn!\nTừ nay mọi lần mua truyện sẽ được giảm thêm 50%.\n\nCảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`
-          );
-        }
-      }
       const bookIds = order.books.map(b => b.id);
       await incrementSoldQuantity(bookIds);
       const isVIPUser = await isUserVIP(order.chatId);
@@ -388,9 +357,9 @@ async function generateListPage(page = 1, chatId = null) {
     if (chatId) {
       const isVIP = await isUserVIP(chatId);
       if (isVIP) {
-        text += `🎟️ BẠN ĐANG LÀ VIP MEMBER\n• Giảm 50% vĩnh viễn\n• Mua Full áp dụng giá 189k\n• Không cần vượt link các truyện Free\n\n`;
+        text += `🎟️ BẠN ĐANG LÀ VIP MEMBER\n• Giảm 50% vĩnh viễn\n• Mua Full áp dụng giá 189k\n\n`;
       } else {
-        text += `💎 VIP Member - Chỉ 139.000đ:\n• Giảm 50% vĩnh viễn\n• Không cần vượt link các truyện Free\n• Mua VIP Member ngay tại /start\n\n`;
+        text += `💎 VIP Member - Chỉ 139.000đ:\n• Giảm 50% vĩnh viễn\n• Mua VIP Member ngay tại /start\n\n`;
         text += `🛒 Mua Full truyện - chỉ 309.000đ:\n• Tặng VIP Member\n\n`;
       }
     }
@@ -427,12 +396,12 @@ bot.onText(/\/start/, async (msg) => {
   let welcomeText = `🐸 Chào mừng bạn đến với Truyện Ếch Xanh\n\n`;
 
   if (isVIP) {
-    welcomeText += `🎟️ BẠN ĐANG LÀ VIP MEMBER\n💎 Giảm 50% tổng hóa đơn (Không áp dụng mua Full, mua Full sẽ được áp dụng giá khác)\n🎁 Áp dụng mua Full còn 189k\n🚀 Không cần phải vượt link cho các truyện Free\n\n`;
+    welcomeText += `🎟️ BẠN ĐANG LÀ VIP MEMBER\n💎 Giảm 50% tổng hóa đơn (Không áp dụng mua Full, mua Full sẽ được áp dụng giá khác)\n🎁 Áp dụng mua Full còn 189k\n\n`;
   } else {
-    welcomeText += `💎 VIP Member - Chỉ 139.000đ (vĩnh viễn):\n• Giảm 50% tổng hóa đơn (Không áp dụng mua Full, mua Full sẽ được áp dụng giá khác)\n• Không cần phải vượt link cho các truyện Free\n\n🛒 Mua Full truyện - chỉ 309.000đ:\n• Tặng VIP Member\n\n`;
+    welcomeText += `💎 VIP Member - Chỉ 139.000đ (vĩnh viễn):\n• Giảm 50% tổng hóa đơn (Không áp dụng mua Full, mua Full sẽ được áp dụng giá khác)\n\n🛒 Mua Full truyện - chỉ 309.000đ:\n• Tặng VIP Member\n\n`;
   }
 
-  welcomeText += `🎊 Ưu đãi mua truyện:\n• Hóa đơn mua truyện từ 50k → giảm 5%, cứ +10k thêm 1%\n• Tối đa 75%`;
+  welcomeText += `🎊 Ưu đãi mua truyện:\n• Hóa đơn mua truyện từ 50k → giảm 5%, cứ +10k thêm 1% (tối đa 39% riêng phần này)\n• Các ưu đãi sẽ được cộng dồn tối đa lên đến 75%`;
 
   // Hiển thị banner event nếu active
   const activeEvent = await getActiveEvent();
@@ -511,7 +480,7 @@ bot.on('callback_query', async (callbackQuery) => {
       if (vipDiscountLines.length > 0) {
         caption += vipDiscountLines.join('\n') + '\n\n';
       }
-      caption += `Quyền lợi của VIP Member:\n• Giảm 50% mọi hóa đơn sau này\n• Mua Full áp dụng giá 189k\n• Không cần phải vượt link cho các truyện Free\n\n🧾 Mã đơn hàng: \`${orderId}\`\n📝 Nội dung chuyển khoản: \`${content}\`\n\nQuét mã QR hoặc chuyển khoản MB Bank 0550767799967\nBot sẽ tự động xác nhận ngay khi nhận tiền!`;
+      caption += `Quyền lợi của VIP Member:\n• Giảm 50% mọi hóa đơn sau này\n• Mua Full áp dụng giá 189k\n\n🧾 Mã đơn hàng: \`${orderId}\`\n📝 Nội dung chuyển khoản: \`${content}\`\n\nQuét mã QR hoặc chuyển khoản MB Bank 0550767799967\nBot sẽ tự động xác nhận ngay khi nhận tiền!`;
 
       await bot.sendPhoto(chatId, qrLink, { caption, parse_mode: 'Markdown' });
       console.log(`📋 TẠO ĐƠN VIP | Order: ${orderId} | User: ${username} | ChatID: ${chatId} | Giá: ${vipPrice.toLocaleString('vi-VN')}đ`);
@@ -585,14 +554,7 @@ bot.on("message", async (msg) => {
   const { finalAmount, discountBreakdown, totalOriginal } = await calculateFinalPrice(selected, isVIP, isFullPurchase);
 
   if (finalAmount <= 0 || selected.every(b => b.free)) {
-    let freeMsg = `🎉 TẤT CẢ TRUYỆN BẠN CHỌN ĐỀU MIỄN PHÍ!\n\n`;
-    if (isVIP) {
-      freeMsg += `💎 Bạn là VIP Member, không cần phải vượt link đâu nhé! Link sẽ được gửi ngay cho bạn.\nCảm ơn bạn đã luôn ủng hộ Truyện Ếch Xanh! 🔥`;
-    } else {
-      freeMsg += `📌 Các bạn chịu khó vượt link giúp mình nha! Mình rất cảm ơn sự ủng hộ nhiệt tình của các bạn.\nLink sẽ được gửi ngay cho bạn! ❤️\n\n`;
-      freeMsg += `🎬 Đây là video hướng dẫn cách vượt link trên điện thoại\n`;
-      freeMsg += `https://docs.google.com/videos/d/1vC_zj2iqhIcrNkZWTY5CBQTghbi5ykQZQ_1XP19l4lM/edit?usp=sharing`;
-    }
+    const freeMsg = `🎉 TẤT CẢ TRUYỆN BẠN CHỌN ĐỀU MIỄN PHÍ!\n\nLink sẽ được gửi ngay cho bạn.\nCảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`;
     await bot.sendMessage(msg.chat.id, freeMsg);
     const freeBookIds = selected.filter(b => b.free).map(b => b.id);
     if (freeBookIds.length > 0) await incrementSoldQuantity(freeBookIds);
@@ -608,8 +570,7 @@ bot.on("message", async (msg) => {
     username: username,
     books: selected,
     amount: finalAmount,
-    paid: false,
-    isFull: isFullPurchase
+    paid: false
   };
 
   // Log chi tiết truyện (chỉ cho đơn truyện, không log full)
@@ -623,59 +584,42 @@ bot.on("message", async (msg) => {
   let content = orderId;
   let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${finalAmount}&addInfo=${content}`;
 
-  if (isFullPurchase) {
-    // ĐƠN MUA FULL: KHÔNG LIỆT KÊ HẾT TRUYỆN, CHỈ THÔNG BÁO MUA FULL
-    let caption = `🛒 MUA FULL TRUYỆN - TOÀN BỘ DANH SÁCH TRUYỆN\n\n`;
-    caption += `💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
-    discountBreakdown.forEach(line => caption += `${line}\n`);
-    caption += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n\n`;
-    caption += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
-    caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
+  const ITEMS_PER_PART = 3;
+  const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
+  let partNumber = 1;
+  let startIndex = 0;
 
-    await bot.sendPhoto(msg.chat.id, qrLink, { caption, parse_mode: 'Markdown' });
+  while (startIndex < selected.length) {
+    const endIndex = Math.min(startIndex + ITEMS_PER_PART, selected.length);
+    const chunk = selected.slice(startIndex, endIndex);
 
-    const instructionText = `🔗 Quét mã QR ở tin nhắn trên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\nNội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link TOÀN BỘ truyện cho bạn ngay lập tức.\n\n⚠️ Lưu ý: Khi tạo đơn mới thì mã QR của các đơn cũ bị vô hiệu.\nNếu gặp lỗi, nhắn @ea7bpp kèm mã đơn ${orderId} + ảnh chuyển khoản để hỗ trợ nhanh!`;
+    let captionPart = `🛒 GIỎ HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\nBạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n`;
 
-    await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
-  } else {
-    // ĐƠN MUA TỪNG TRUYỆN: GIỮ NGUYÊN LOGIC CHUNK
-    const ITEMS_PER_PART = 3;
-    const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
-    let partNumber = 1;
-    let startIndex = 0;
+    if (endIndex === selected.length) {
+      captionPart += `\n💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
+      discountBreakdown.forEach(line => captionPart += `${line}\n`);
+      captionPart += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n\n`;
+      captionPart += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
+      
 
-    while (startIndex < selected.length) {
-      const endIndex = Math.min(startIndex + ITEMS_PER_PART, selected.length);
-      const chunk = selected.slice(startIndex, endIndex);
-
-      let captionPart = `🛒 GIỎ HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\nBạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n`;
-
-      if (endIndex === selected.length) {
-        captionPart += `\n💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
-        discountBreakdown.forEach(line => captionPart += `${line}\n`);
-        captionPart += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n\n`;
-        captionPart += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
-        
-
-        if (isVIP && !isFullPurchase) captionPart += `💎 Bạn đang là VIP - Đã giảm 50%!\n`;
-        captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
-      }
-
-      if (partNumber === 1) {
-        await bot.sendPhoto(msg.chat.id, qrLink, { caption: captionPart, parse_mode: 'Markdown' });
-      } else {
-        await bot.sendMessage(msg.chat.id, captionPart, { parse_mode: 'Markdown' });
-      }
-
-      if (endIndex < selected.length) await new Promise(r => setTimeout(r, 1000));
-      startIndex = endIndex;
-      partNumber++;
+      if (isVIP && !isFullPurchase) captionPart += `💎 Bạn đang là VIP - Đã giảm 50%!\n`;
+      captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
     }
 
-    const instructionText = `🔗 Quét mã QR ở tin nhắn đầu tiên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\nNội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n⚠️ Lưu ý: Khi tạo đơn mới thì mã QR của các đơn cũ bị vô hiệu.\nNếu gặp lỗi, nhắn @ea7bpp kèm mã đơn ${orderId} + ảnh chuyển khoản để hỗ trợ nhanh!`;
+    if (partNumber === 1) {
+      await bot.sendPhoto(msg.chat.id, qrLink, { caption: captionPart, parse_mode: 'Markdown' });
+    } else {
+      await bot.sendMessage(msg.chat.id, captionPart, { parse_mode: 'Markdown' });
+    }
 
-    await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
+    if (endIndex < selected.length) await new Promise(r => setTimeout(r, 1000));
+    startIndex = endIndex;
+    partNumber++;
   }
+
+  const instructionText = `🔗 Quét mã QR ở tin nhắn đầu tiên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\nNội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n⚠️ Lưu ý: Khi tạo đơn mới thì mã QR của các đơn cũ bị vô hiệu.\nNếu gặp lỗi, nhắn @ea7bpp kèm mã đơn ${orderId} + ảnh chuyển khoản để hỗ trợ nhanh!`;
+
+  await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
 });
 
 app.get("/ping", (req, res) => res.send("alive"));
