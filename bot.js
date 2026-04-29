@@ -607,7 +607,11 @@ bot.on("message", async (msg) => {
     caption += `💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
     discountBreakdown.forEach(line => caption += `${line}\n`);
     caption += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n`;
+// ==================== CHỈ HIỆN DÒNG TẶNG VIP NẾU CHƯA LÀ VIP ====================
+  if (!isVIP) {
     caption += `✨ Tặng VIP Member vĩnh viễn (giảm 50% mọi đơn hàng sau này)\n\n`;
+  }
+  // ========================================================================
     caption += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
     caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
