@@ -262,26 +262,50 @@ app.post("/sepay", async (req, res) => {
   const userInfo = `${order.username || 'Không có username'} | ChatID: ${order.chatId}`;
   console.log(`✅ THANH TOÁN THÀNH CÔNG | Order: ${orderId} | User: ${userInfo} | Số tiền: ${amount.toLocaleString('vi-VN')}đ`);
 
-  try {
-    if (order.isVIP) {
+try {
+  if (order.isVIP) {
+    await addToVIP(order.chatId);
+    await bot.sendMessage(order.chatId, 
+      `🎉 THANH TOÁN VIP THÀNH CÔNG!\n\n💎 Bạn đã trở thành VIP Member.\nTừ nay mọi lần mua truyện sẽ được giảm thêm 50%.\n\nCảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`
+    );
+  } 
+  else if (order.isFullPurchase) {
+    // ==================== XỬ LÝ MUA FULL ====================
+    const bookIds = order.books.map(b => b.id);
+    await incrementSoldQuantity(bookIds);
+
+    const isAlreadyVIP = await isUserVIP(order.chatId);
+
+    if (!isAlreadyVIP) {
       await addToVIP(order.chatId);
       await bot.sendMessage(order.chatId, 
-        `🎉 THANH TOÁN VIP THÀNH CÔNG!\n\n💎 Bạn đã trở thành VIP Member.\nTừ nay mọi lần mua truyện sẽ được giảm thêm 50%.\n\nCảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`
+        `🎉 CẢM ƠN BẠN ĐÃ MUA FULL TRUYỆN!\n\n💎 Bạn đã được **tặng VIP Member vĩnh viễn**!\nTừ nay mọi đơn hàng sẽ được giảm 50%.\n\nLink truyện sẽ được gửi ngay bên dưới.`
       );
     } else {
-      const bookIds = order.books.map(b => b.id);
-      await incrementSoldQuantity(bookIds);
-      const isVIPUser = await isUserVIP(order.chatId);
-      await sendBookLinks(order.chatId, order.books, false, isVIPUser);
-    }
-  } catch (err) {
-    console.error(`❌ LỖI XỬ LÝ ĐƠN ${orderId} | User: ${userInfo} | Error:`, err.message);
-    if (order.chatId) {
       await bot.sendMessage(order.chatId, 
-        `✅ Thanh toán đã thành công nhưng có lỗi hệ thống.\nNhắn @ea7bpp kèm mã đơn \`${orderId}\` để được hỗ trợ ngay!`
-      ).catch(() => {});
+        `✅ THANH TOÁN FULL THÀNH CÔNG!\n\nBạn đã là VIP Member rồi nên không cần tặng thêm.\nLink truyện sẽ được gửi ngay bên dưới.`
+      );
     }
+
+    const isVIPUser = await isUserVIP(order.chatId);
+    await sendBookLinks(order.chatId, order.books, false, isVIPUser);
+
+  } 
+  else {
+    // ==================== ĐƠN MUA LẺ (bình thường) ====================
+    const bookIds = order.books.map(b => b.id);
+    await incrementSoldQuantity(bookIds);
+    const isVIPUser = await isUserVIP(order.chatId);
+    await sendBookLinks(order.chatId, order.books, false, isVIPUser);
   }
+} catch (err) {
+  console.error(`❌ LỖI XỬ LÝ ĐƠN ${orderId} | User: ${userInfo} | Error:`, err.message);
+  if (order.chatId) {
+    await bot.sendMessage(order.chatId, 
+      `✅ Thanh toán đã thành công nhưng có lỗi hệ thống.\nNhắn @ea7bpp kèm mã đơn \`${orderId}\` để được hỗ trợ ngay!`
+    ).catch(() => {});
+  }
+}
 
   delete orders[orderId];
   res.send("ok");
@@ -562,7 +586,8 @@ bot.on("message", async (msg) => {
     username: username,
     books: selected,
     amount: finalAmount,
-    paid: false
+    paid: false,
+    isFullPurchase: true
   };
 
   // Log chi tiết truyện (chỉ cho đơn truyện, không log full)
@@ -581,7 +606,8 @@ bot.on("message", async (msg) => {
     let caption = `🛒 MUA FULL TRUYỆN - TOÀN BỘ DANH SÁCH\n\n`;
     caption += `💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
     discountBreakdown.forEach(line => caption += `${line}\n`);
-    caption += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n\n`;
+    caption += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n`;
+    caption += `✨ Tặng VIP Member vĩnh viễn (giảm 50% mọi đơn hàng sau này)\n\n`;
     caption += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
     caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
