@@ -587,7 +587,7 @@ bot.on("message", async (msg) => {
     books: selected,
     amount: finalAmount,
     paid: false,
-    isFullPurchase: true
+    isFullPurchase: isFullPurchase
   };
 
   // Log chi tiết truyện (chỉ cho đơn truyện, không log full)
