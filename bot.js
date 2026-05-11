@@ -23,39 +23,43 @@ process.on('uncaughtException', (err) => {
 
 
 
-// ======================
-//   HÀM GỬI QR CODE CÓ RETRY + YÊU CẦU TẠO LẠI ĐƠN (cold start)
-// ======================
-async function sendQRCode(chatId, qrUrl, caption, maxRetries = 3) {
+const QRCode = require('qrcode');
+
+// Hàm mới - generate QR local
+async function sendQRCode(chatId, amount, content, caption, maxRetries = 3) {
+  const qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${amount}&addInfo=${content}`;
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await bot.sendPhoto(chatId, qrUrl, { 
+      // Tạo QR code thành Buffer ngay trên server
+      const qrBuffer = await QRCode.toBuffer(content, {
+        width: 400,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+
+      await bot.sendPhoto(chatId, qrBuffer, { 
         caption, 
         parse_mode: 'Markdown' 
       });
-      console.log(`✅ Gửi QR code thành công`);
+      
+      console.log(`✔ Gửi QR code local thành công`);
       return true;
-    } catch (err) {   
+    } catch (err) {
+      console.error(`❌ Lần ${attempt} gửi QR thất bại:`, err.message);
       if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, 800 * attempt)); // backoff
+        await new Promise(r => setTimeout(r, 1000 * attempt));
       }
     }
   }
 
-  // ==================== FAIL HẾT 3 LẦN → YÊU CẦU TẠO LẠI ĐƠN ====================
-  console.error(`❌ Gửi QR thất bại`);
-  try {
-    await bot.sendMessage(chatId,
-      `🔧 Đã xảy ra lỗi trong quá trình tạo đơn hàng, vui lòng tạo lại đơn hàng`,
-      { parse_mode: 'Markdown' }
-    );
-  } catch (e) {
-    console.error('Không gửi được thông báo tạo lại đơn:', e.message);
-  }
-  
+  // Fail hết → thông báo tạo lại đơn
+  await bot.sendMessage(chatId, 
+    `🔧 Đã xảy ra lỗi trong quá trình tạo đơn hàng, vui lòng tạo lại đơn hàng`, 
+    { parse_mode: 'Markdown' }
+  ).catch(() => {});
   return false;
 }
-
 
 
 
@@ -539,7 +543,8 @@ bot.on('callback_query', async (callbackQuery) => {
       caption += `Quyền lợi của VIP Member:\n• Giảm 50% mọi hóa đơn sau này\n• Mua Full áp dụng giá 189k\n\n🧾 Mã đơn hàng: \`${orderId}\`\n📝 Nội dung chuyển khoản: \`${content}\`\n\nQuét mã QR hoặc chuyển khoản MB Bank 0550767799967\nBot sẽ tự động xác nhận ngay khi nhận tiền!`;
 
       // await bot.sendPhoto(chatId, qrLink, { caption, parse_mode: 'Markdown' });
-      await sendQRCode(chatId, qrLink, caption);
+      // await sendQRCode(chatId, qrLink, caption);
+      await sendQRCode(chatId, finalAmount, orderId, caption);
       console.log(`📋 TẠO ĐƠN VIP | Order: ${orderId} | User: ${username} | ChatID: ${chatId} | Giá: ${vipPrice.toLocaleString('vi-VN')}đ`);
     } catch (err) {
       console.error('❌ LỖI BUY VIP:', err.message);
@@ -657,7 +662,8 @@ bot.on("message", async (msg) => {
     caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
     // await bot.sendPhoto(msg.chat.id, qrLink, { caption, parse_mode: 'Markdown' });
-      await sendQRCode(msg.chat.id, qrLink, caption);
+      // await sendQRCode(msg.chat.id, qrLink, caption);
+      await sendQRCode(chatId, finalAmount, orderId, caption);
   } else {
     const ITEMS_PER_PART = 3;
     const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
@@ -681,7 +687,8 @@ bot.on("message", async (msg) => {
 
       if (partNumber === 1) {
         // await bot.sendPhoto(msg.chat.id, qrLink, { caption: captionPart, parse_mode: 'Markdown' });
-        await sendQRCode(msg.chat.id, qrLink, captionPart);
+        // await sendQRCode(msg.chat.id, qrLink, captionPart);
+        await sendQRCode(chatId, finalAmount, orderId, caption);
       } else {
         await bot.sendMessage(msg.chat.id, captionPart, { parse_mode: 'Markdown' });
       }
