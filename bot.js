@@ -543,8 +543,8 @@ bot.on('callback_query', async (callbackQuery) => {
       caption += `Quyền lợi của VIP Member:\n• Giảm 50% mọi hóa đơn sau này\n• Mua Full áp dụng giá 189k\n\n🧾 Mã đơn hàng: \`${orderId}\`\n📝 Nội dung chuyển khoản: \`${content}\`\n\nQuét mã QR hoặc chuyển khoản MB Bank 0550767799967\nBot sẽ tự động xác nhận ngay khi nhận tiền!`;
 
       // await bot.sendPhoto(chatId, qrLink, { caption, parse_mode: 'Markdown' });
-      // await sendQRCode(chatId, qrLink, caption);
-      await sendQRCode(chatId, finalAmount, orderId, caption);
+      await sendQRCode(chatId, qrLink, caption);
+      // await sendQRCode(chatId, finalAmount, orderId, caption);
       console.log(`📋 TẠO ĐƠN VIP | Order: ${orderId} | User: ${username} | ChatID: ${chatId} | Giá: ${vipPrice.toLocaleString('vi-VN')}đ`);
     } catch (err) {
       console.error('❌ LỖI BUY VIP:', err.message);
@@ -662,8 +662,8 @@ bot.on("message", async (msg) => {
     caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
     // await bot.sendPhoto(msg.chat.id, qrLink, { caption, parse_mode: 'Markdown' });
-      // await sendQRCode(msg.chat.id, qrLink, caption);
-      await sendQRCode(chatId, finalAmount, orderId, caption);
+      await sendQRCode(msg.chat.id, qrLink, caption);
+      // await sendQRCode(chatId, finalAmount, orderId, caption);
   } else {
     const ITEMS_PER_PART = 3;
     const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
@@ -687,8 +687,8 @@ bot.on("message", async (msg) => {
 
       if (partNumber === 1) {
         // await bot.sendPhoto(msg.chat.id, qrLink, { caption: captionPart, parse_mode: 'Markdown' });
-        // await sendQRCode(msg.chat.id, qrLink, captionPart);
-        await sendQRCode(chatId, finalAmount, orderId, caption);
+        await sendQRCode(msg.chat.id, qrLink, captionPart);
+        // await sendQRCode(chatId, finalAmount, orderId, caption);
       } else {
         await bot.sendMessage(msg.chat.id, captionPart, { parse_mode: 'Markdown' });
       }
