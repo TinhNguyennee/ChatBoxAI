@@ -2,6 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const { Pool } = require('pg');
 const express = require("express");
 const bodyParser = require("body-parser");
+const QRCode = require('qrcode');
+const { VietQr } = require('dynamic-vietqr');
 
 // TOKEN từ env
 const token = process.env.BOT_TOKEN;
@@ -24,36 +26,55 @@ process.on('uncaughtException', (err) => {
 
 
 // ======================
-//   HÀM GỬI QR CODE CÓ RETRY + YÊU CẦU TẠO LẠI ĐƠN (cold start)
+//   HÀM GỬI QR CODE (đơn giản, không retry)
 // ======================
-async function sendQRCode(chatId, qrUrl, caption, maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await bot.sendPhoto(chatId, qrUrl, { 
-        caption, 
-        parse_mode: 'Markdown' 
-      });
-      console.log(`✅ Gửi QR code thành công`);
-      return true;
-    } catch (err) {   
-      if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, 800 * attempt)); // backoff
-      }
-    }
-  }
-
-  // ==================== FAIL HẾT 3 LẦN → YÊU CẦU TẠO LẠI ĐƠN ====================
-  console.error(`❌ Gửi QR thất bại`);
+async function sendQRCode(chatId, soTien, noiDung, caption) {
   try {
-    await bot.sendMessage(chatId,
-      `🔧 Đã xảy ra lỗi trong quá trình tạo đơn hàng, vui lòng tạo lại đơn hàng`,
-      { parse_mode: 'Markdown' }
+
+
+    // 1. Tạo payload VietQR chuẩn (local)
+    const vietqr = new VietQr("0550767799967", "970422");
+    const payload = vietqr.dynamicIBFTToAccount(
+      soTien.toString(),           // số tiền
+      noiDung                      // nội dung chuyển khoản
     );
-  } catch (e) {
-    console.error('Không gửi được thông báo tạo lại đơn:', e.message);
+
+    // 2. Vẽ QR từ payload bằng npm qrcode
+    const qrBuffer = await QRCode.toBuffer(payload, {
+      errorCorrectionLevel: 'M',   // cao nhất để quét dễ
+      margin: 2,
+      width: 350,                  // kích thước đẹp
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+
+
+    await bot.sendPhoto(chatId, qrBuffer, { 
+      caption, 
+      parse_mode: 'Markdown' 
+    });
+
+
+
+    console.log(`✔ Gửi QR code thành công`);
+    return true;
+  } catch (err) {   
+    console.error(`❌ Gửi QR thất bại`);
+    
+    // ==================== GỬI THÔNG BÁO TẠO LẠI ĐƠN ====================
+    try {
+      await bot.sendMessage(chatId,
+        `🔧 Đã xảy ra lỗi trong quá trình tạo đơn hàng, vui lòng tạo lại đơn hàng`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (e) {
+      console.error('Không gửi được thông báo tạo lại đơn:', e.message);
+    }
+    
+    return false;
   }
-  
-  return false;
 }
 
 
@@ -539,7 +560,7 @@ bot.on('callback_query', async (callbackQuery) => {
       caption += `Quyền lợi của VIP Member:\n• Giảm 50% mọi hóa đơn sau này\n• Mua Full áp dụng giá 189k\n\n🧾 Mã đơn hàng: \`${orderId}\`\n📝 Nội dung chuyển khoản: \`${content}\`\n\nQuét mã QR hoặc chuyển khoản MB Bank 0550767799967\nBot sẽ tự động xác nhận ngay khi nhận tiền!`;
 
       // await bot.sendPhoto(chatId, qrLink, { caption, parse_mode: 'Markdown' });
-      await sendQRCode(chatId, qrLink, caption);
+      await sendQRCode(chatId, vipPrice, content, caption);
       console.log(`📋 TẠO ĐƠN VIP | Order: ${orderId} | User: ${username} | ChatID: ${chatId} | Giá: ${vipPrice.toLocaleString('vi-VN')}đ`);
     } catch (err) {
       console.error('❌ LỖI BUY VIP:', err.message);
@@ -657,7 +678,7 @@ bot.on("message", async (msg) => {
     caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
 
     // await bot.sendPhoto(msg.chat.id, qrLink, { caption, parse_mode: 'Markdown' });
-      await sendQRCode(msg.chat.id, qrLink, caption);
+      await sendQRCode(msg.chat.id, finalAmount, content, caption);
   } else {
     const ITEMS_PER_PART = 3;
     const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
@@ -681,7 +702,7 @@ bot.on("message", async (msg) => {
 
       if (partNumber === 1) {
         // await bot.sendPhoto(msg.chat.id, qrLink, { caption: captionPart, parse_mode: 'Markdown' });
-        await sendQRCode(msg.chat.id, qrLink, captionPart);
+        await sendQRCode(msg.chat.id, finalAmount, content, captionPart);
       } else {
         await bot.sendMessage(msg.chat.id, captionPart, { parse_mode: 'Markdown' });
       }
