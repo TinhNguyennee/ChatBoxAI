@@ -95,8 +95,77 @@ app.use(bodyParser.json());
 const orders = {};
 
 // Tạo mã đơn
-function createOrderId() {
-  return "OD" + Math.floor(Math.random() * 1000000);
+async function createOrderId() {
+  let base = "OD" + Math.floor(Math.random() * 1000000);
+  let candidate = base;
+
+  while (true) {
+    try {
+      const result = await pool.query(
+        'SELECT 1 FROM public.orders WHERE order_code = $1 LIMIT 1',
+        [candidate]
+      );
+
+      if (result.rowCount === 0) {
+        return candidate;
+      }
+
+      candidate = base + 'T';
+      base = candidate;
+    } catch (err) {
+      console.error('❌ Lỗi kiểm tra trùng mã đơn:', err.message);
+      return candidate;
+    }
+  }
+}
+
+function normalizeOrderReference(value) {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/\b0(?=D\d)/g, 'O');
+}
+
+function isAcceptedPaymentAmount(receivedAmount, expectedAmount) {
+  const received = Number(receivedAmount);
+  const expected = Number(expectedAmount);
+
+  if (!Number.isFinite(received) || !Number.isFinite(expected)) {
+    return false;
+  }
+
+  const roundedReceived = Math.round(received);
+  const roundedExpected = Math.round(expected);
+
+  return roundedReceived >= roundedExpected && roundedReceived <= roundedExpected + 1000;
+}
+
+function findMatchingOrderId(content, ordersMap) {
+  const normalizedContent = normalizeOrderReference(content);
+  return Object.keys(ordersMap).find((id) => {
+    const normalizedId = normalizeOrderReference(id);
+    return normalizedContent.includes(normalizedId);
+  });
+}
+
+async function saveCompletedOrder(orderId, order) {
+  if (!orderId || !order) return;
+
+  const booksText = Array.isArray(order.books) && order.books.length > 0
+    ? order.books.map((b) => b.id).join(',')
+    : (order.isVIP ? 'VIP' : '');
+
+  try {
+    await pool.query(
+      `INSERT INTO public.orders (order_code, telegram_id, amount, books, status)
+       VALUES ($1, $2, $3, $4, 'completed')
+       ON CONFLICT (order_code) DO NOTHING`,
+      [orderId, String(order.chatId ?? ''), Number(order.amount || 0), booksText]
+    );
+    console.log(`💾 Đã lưu đơn vào DB | Order: ${orderId}`);
+  } catch (err) {
+    console.error(`❌ Lỗi lưu đơn vào DB | Order: ${orderId} | Error:`, err.message);
+  }
 }
 
 // ======================
@@ -300,7 +369,87 @@ async function sendBookLinks(chatId, books, isFree = false, isVIP = false) {
     if (partNumber < totalParts) await new Promise(r => setTimeout(r, 1500));
   }
 }
+async function createOrderAndSendQRCode(chatId, selected, isFullPurchase = false, username = '') {
+  if (!chatId || !selected || selected.length === 0) return;
 
+  const isVIP = await isUserVIP(chatId);
+  const { finalAmount, discountBreakdown, totalOriginal } = await calculateFinalPrice(selected, isVIP, isFullPurchase);
+
+  if (finalAmount <= 0 || selected.every(b => b.free)) {
+    const freeMsg = `🎉 TẤT CẢ TRUYỆN BẠN CHỌN ĐỀU MIỄN PHÍ!\n\nLink sẽ được gửi ngay cho bạn.\nCảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`;
+    await bot.sendMessage(chatId, freeMsg);
+    const freeBookIds = selected.filter(b => b.free).map(b => b.id);
+    if (freeBookIds.length > 0) await incrementSoldQuantity(freeBookIds);
+    await sendBookLinks(chatId, selected, true, isVIP);
+    return;
+  }
+
+  if (!username) {
+    username = 'Không có username';
+  }
+
+  const orderId = await createOrderId();
+  orders[orderId] = {
+    chatId,
+    username,
+    books: selected,
+    amount: finalAmount,
+    paid: false,
+    isFullPurchase
+  };
+
+  const content = orderId;
+  const qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${finalAmount}&addInfo=${content}`;
+
+  if (isFullPurchase) {
+    let caption = `🛒 MUA FULL TRUYỆN - TOÀN BỘ DANH SÁCH\n\n`;
+    caption += `💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
+    discountBreakdown.forEach(line => caption += `${line}\n`);
+    caption += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n`;
+    if (!isVIP) {
+      caption += `✨ Tặng VIP Member vĩnh viễn (giảm 50% mọi đơn hàng sau này)\n\n`;
+    }
+    caption += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
+    caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
+
+    await sendQRCode(chatId, finalAmount, content, caption);
+  } else {
+    const ITEMS_PER_PART = 3;
+    const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
+    let partNumber = 1;
+    let startIndex = 0;
+
+    while (startIndex < selected.length) {
+      const endIndex = Math.min(startIndex + ITEMS_PER_PART, selected.length);
+      const chunk = selected.slice(startIndex, endIndex);
+
+      let captionPart = `🛒 GIỎ HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\nBạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n`;
+
+      if (endIndex === selected.length) {
+        captionPart += `\n💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
+        discountBreakdown.forEach(line => captionPart += `${line}\n`);
+        captionPart += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n\n`;
+        captionPart += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
+        if (isVIP) captionPart += `💎 Bạn đang là VIP - Đã giảm 50%!\n`;
+        captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
+      }
+
+      if (partNumber === 1) {
+        await sendQRCode(chatId, finalAmount, content, captionPart);
+      } else {
+        await bot.sendMessage(chatId, captionPart, { parse_mode: 'Markdown' });
+      }
+
+      if (endIndex < selected.length) await new Promise(r => setTimeout(r, 1000));
+      startIndex = endIndex;
+      partNumber++;
+    }
+  }
+
+  const instructionText = `🔗 Quét mã QR ở tin nhắn trên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\nNội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n⚠️ Lưu ý: Khi tạo đơn mới thì mã QR của các đơn cũ bị vô hiệu.\nNếu gặp lỗi, nhắn @ea7bpp kèm mã đơn ${orderId} + ảnh chuyển khoản để hỗ trợ nhanh!`;
+
+  await bot.sendMessage(chatId, instructionText, { parse_mode: 'Markdown' });
+}
 // ======================
 //       WEBHOOK
 // ======================
@@ -309,19 +458,26 @@ app.post("/sepay", async (req, res) => {
   console.log("Webhook Sepay nhận:", JSON.stringify(req.body, null, 2));
 
   let data = req.body;
-  let content = (data.content || data.description || "").trim().toUpperCase();
+  let content = (data.content || data.description || "").trim();
   let amount = data.transferAmount || data.amount;
 
-  let orderId = Object.keys(orders).find(id => content.includes(id));
+  let orderId = findMatchingOrderId(content, orders);
   if (!orderId) return res.send("ok");
 
   let order = orders[orderId];
   if (!order || order.paid) return res.send("ok");
-  if (order.amount !== amount) return res.send("ok");
+
+  const receivedAmount = Number(amount);
+  const expectedAmount = Number(order.amount);
+  if (!isAcceptedPaymentAmount(receivedAmount, expectedAmount)) {
+    return res.send("ok");
+  }
 
   order.paid = true;
+  await saveCompletedOrder(orderId, order);
   const userInfo = `${order.username || 'Không có username'} | ChatID: ${order.chatId}`;
-  console.log(`✅ THANH TOÁN THÀNH CÔNG | Order: ${orderId} | User: ${userInfo} | Số tiền: ${amount.toLocaleString('vi-VN')}đ`);
+  const amountDiff = receivedAmount - expectedAmount;
+  console.log(`✅ THANH TOÁN THÀNH CÔNG | Order: ${orderId} | User: ${userInfo} | Số tiền nhận: ${receivedAmount.toLocaleString('vi-VN')}đ | Mức cần thanh toán: ${expectedAmount.toLocaleString('vi-VN')}đ | Chênh lệch: ${amountDiff.toLocaleString('vi-VN')}đ`);
 
 try {
   if (order.isVIP) {
@@ -491,6 +647,7 @@ bot.onText(/\/start/, async (msg) => {
   const keyboard = {
     inline_keyboard: [
       [{ text: "📚 Xem Danh Sách Truyện", callback_data: "show_list" }],
+      [{ text: "🛒 Mua Full Truyện", callback_data: "buy_full" }],
       isVIP 
         ? [{ text: "✅ Bạn đã là VIP Member", callback_data: "already_vip" }]
         : [{ text: "💎 Mua VIP (139k) - Vĩnh viễn", callback_data: "buy_vip" }]
@@ -543,7 +700,7 @@ bot.on('callback_query', async (callbackQuery) => {
         vipDiscountLines.push(`🎉 Giảm sự kiện ${eventPercent}%: -${eventDiscount.toLocaleString('vi-VN')}đ`);
       }
 
-      const orderId = createOrderId();
+      const orderId = await createOrderId();
       const username = callbackQuery.from.username ? `@${callbackQuery.from.username}` : callbackQuery.from.first_name || 'Không có username';
 
       orders[orderId] = { chatId, username, isVIP: true, amount: vipPrice, paid: false };
@@ -577,6 +734,18 @@ bot.on('callback_query', async (callbackQuery) => {
   if (data === 'show_list') {
     const { text, inlineKeyboard } = await generateListPage(1, chatId);
     await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: inlineKeyboard } });
+    return;
+  }
+
+  if (data === 'buy_full') {
+    try {
+      const allBooks = await getBooks();
+      const username = callbackQuery.from.username ? `@${callbackQuery.from.username}` : callbackQuery.from.first_name || 'Không có username';
+      await createOrderAndSendQRCode(chatId, allBooks, true, username);
+    } catch (err) {
+      console.error('❌ LỖI BUY FULL CALLBACK:', err.message);
+      await bot.sendMessage(chatId, `❌ Có lỗi khi tạo đơn Full. Vui lòng thử lại hoặc nhắn @ea7bpp để được hỗ trợ.`).catch(() => {});
+    }
     return;
   }
 
@@ -628,94 +797,8 @@ bot.on("message", async (msg) => {
     return bot.sendMessage(msg.chat.id, 'Không tìm thấy truyện nào với số bạn nhập 😕.');
   }
 
-  const isVIP = await isUserVIP(msg.chat.id);
-  const { finalAmount, discountBreakdown, totalOriginal } = await calculateFinalPrice(selected, isVIP, isFullPurchase);
-
-  if (finalAmount <= 0 || selected.every(b => b.free)) {
-    const freeMsg = `🎉 TẤT CẢ TRUYỆN BẠN CHỌN ĐỀU MIỄN PHÍ!\n\nLink sẽ được gửi ngay cho bạn.\nCảm ơn bạn đã ủng hộ Truyện Ếch Xanh! 🔥`;
-    await bot.sendMessage(msg.chat.id, freeMsg);
-    const freeBookIds = selected.filter(b => b.free).map(b => b.id);
-    if (freeBookIds.length > 0) await incrementSoldQuantity(freeBookIds);
-    await sendBookLinks(msg.chat.id, selected, true, isVIP);
-    return;
-  }
-
-  let orderId = createOrderId();
   const username = msg.from.username ? `@${msg.from.username}` : msg.from.first_name || 'Không có username';
-
-  orders[orderId] = {
-    chatId: msg.chat.id,
-    username: username,
-    books: selected,
-    amount: finalAmount,
-    paid: false,
-    isFullPurchase: isFullPurchase
-  };
-
-  // Log chi tiết truyện (chỉ cho đơn truyện, không log full)
-  if (!isFullPurchase) {
-    const bookNames = selected.map(b => `${b.id}`).join(' | ');
-    console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ | Truyện: ${bookNames}`);
-  } else {
-    console.log(`📋 TẠO ĐƠN FULL | Order: ${orderId} | User: ${username} | ChatID: ${msg.chat.id} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ`);
-  }
-
-  let content = orderId;
-  let qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${finalAmount}&addInfo=${content}`;
-
-  if (isFullPurchase) {
-    // CHỈ HIỂN THỊ TÓM TẮT, KHÔNG LIỆT KÊ HẾT TRUYỆN
-    let caption = `🛒 MUA FULL TRUYỆN - TOÀN BỘ DANH SÁCH\n\n`;
-    caption += `💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
-    discountBreakdown.forEach(line => caption += `${line}\n`);
-    caption += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n`;
-// ==================== CHỈ HIỆN DÒNG TẶNG VIP NẾU CHƯA LÀ VIP ====================
-  if (!isVIP) {
-    caption += `✨ Tặng VIP Member vĩnh viễn (giảm 50% mọi đơn hàng sau này)\n\n`;
-  }
-  // ========================================================================
-    caption += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
-    caption += `Cảm ơn bạn đã ủng hộ! ❤️`;
-
-    // await bot.sendPhoto(msg.chat.id, qrLink, { caption, parse_mode: 'Markdown' });
-      await sendQRCode(msg.chat.id, finalAmount, content, caption);
-  } else {
-    const ITEMS_PER_PART = 3;
-    const totalParts = Math.ceil(selected.length / ITEMS_PER_PART);
-    let partNumber = 1;
-    let startIndex = 0;
-
-    while (startIndex < selected.length) {
-      const endIndex = Math.min(startIndex + ITEMS_PER_PART, selected.length);
-      const chunk = selected.slice(startIndex, endIndex);
-
-      let captionPart = `🛒 GIỎ HÀNG CỦA BẠN ĐÃ SẴN SÀNG! (Phần ${partNumber}/${totalParts})\n\nBạn đã chọn:\n${chunk.map(b => `• ${b.id}. ${b.name}`).join("\n")}\n`;
-
-      if (endIndex === selected.length) {
-        captionPart += `\n💰 Tổng tiền gốc: ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
-        discountBreakdown.forEach(line => captionPart += `${line}\n`);
-        captionPart += `💳 Số tiền cần thanh toán: ${finalAmount.toLocaleString('vi-VN')}đ\n\n`;
-        captionPart += `🧾 Mã đơn hàng: ${orderId}\n📝 Nội dung chuyển khoản chính xác: \`${content}\`\n\n`;
-        if (isVIP) captionPart += `💎 Bạn đang là VIP - Đã giảm 50%!\n`;
-        captionPart += `Cảm ơn bạn đã ủng hộ! ❤️`;
-      }
-
-      if (partNumber === 1) {
-        // await bot.sendPhoto(msg.chat.id, qrLink, { caption: captionPart, parse_mode: 'Markdown' });
-        await sendQRCode(msg.chat.id, finalAmount, content, captionPart);
-      } else {
-        await bot.sendMessage(msg.chat.id, captionPart, { parse_mode: 'Markdown' });
-      }
-
-      if (endIndex < selected.length) await new Promise(r => setTimeout(r, 1000));
-      startIndex = endIndex;
-      partNumber++;
-    }
-  }
-
-  const instructionText = `🔗 Quét mã QR ở tin nhắn trên hoặc chuyển khoản theo thông tin ngân hàng (0550767799967 MB Bank)\nNội dung chuyển khoản phải đúng chính xác với Mã Đơn Hàng: \`${orderId}\`.\n\n⏳ Sau khi nhận được thanh toán, bot sẽ tự động gửi link truyện cho bạn ngay lập tức.\n\n⚠️ Lưu ý: Khi tạo đơn mới thì mã QR của các đơn cũ bị vô hiệu.\nNếu gặp lỗi, nhắn @ea7bpp kèm mã đơn ${orderId} + ảnh chuyển khoản để hỗ trợ nhanh!`;
-
-  await bot.sendMessage(msg.chat.id, instructionText, { parse_mode: 'Markdown' });
+  await createOrderAndSendQRCode(msg.chat.id, selected, isFullPurchase, username);
 });
 
 app.get("/ping", (req, res) => res.send("alive"));
