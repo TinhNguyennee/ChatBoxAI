@@ -398,6 +398,13 @@ async function createOrderAndSendQRCode(chatId, selected, isFullPurchase = false
     isFullPurchase
   };
 
+  if (!isFullPurchase) {
+    const bookNames = selected.map(b => `${b.id}`).join(' | ');
+    console.log(`📋 TẠO ĐƠN TRUYỆN | Order: ${orderId} | User: ${username} | ChatID: ${chatId} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ | Truyện: ${bookNames}`);
+  } else {
+    console.log(`📋 TẠO ĐƠN FULL | Order: ${orderId} | User: ${username} | ChatID: ${chatId} | Số tiền: ${finalAmount.toLocaleString('vi-VN')}đ`);
+  }
+
   const content = orderId;
   const qrLink = `https://img.vietqr.io/image/MB-0550767799967-compact.png?amount=${finalAmount}&addInfo=${content}`;
 
