@@ -25,7 +25,7 @@ const {
 //   KHỞI TẠO TELEGRAM BOT
 // ======================
 const isPolling = process.env.NODE_ENV === 'development' || process.env.USE_POLLING === 'true';
-const bot = new TelegramBot(BOT_TOKEN, { polling: isPolling });
+const bot = new TelegramBot(BOT_TOKEN, { polling: false });
 
 // ======================
 //   EXPRESS SERVER & WEBHOOK
@@ -110,13 +110,20 @@ async function startApp() {
     // 2. Khởi chạy worker dọn dẹp và nhắc nhở đơn hàng quá hạn 15 phút
     startExpirationWorker(bot);
 
-    // 3. Thiết lập Webhook Telegram nếu chạy trên Render
-    if (!isPolling && BOT_TOKEN && RENDER_EXTERNAL_URL) {
+    // 3. Khởi động Webhook hoặc Polling
+    if (isPolling && BOT_TOKEN) {
+      try {
+        await bot.deleteWebHook();
+        console.log('🔄 Đã xóa Webhook cũ trên Telegram để chuyển sang Polling.');
+      } catch (e) {
+        // bỏ qua nếu chưa từng set webhook
+      }
+      await bot.startPolling();
+      console.log('🚀 Bot đang chạy ở chế độ POLLING (Development local)');
+    } else if (!isPolling && BOT_TOKEN && RENDER_EXTERNAL_URL) {
       const webhookUrl = `${RENDER_EXTERNAL_URL}/bot${BOT_TOKEN}`;
       await bot.setWebHook(webhookUrl);
       console.log(`✅ Webhook Telegram đã được kích hoạt tại: ${webhookUrl}`);
-    } else if (isPolling) {
-      console.log('🚀 Bot đang chạy ở chế độ POLLING (Development)');
     }
 
     // 4. Khởi động Web Server Express
