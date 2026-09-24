@@ -31,28 +31,57 @@ async function runMigrations() {
       );
     `);
 
-    // 3. Bảng đơn hàng (Thời hạn 15 phút cho đơn PENDING)
+    // 3. Đảm bảo bảng orders có đầy đủ các cột (tương thích 100% với 732 đơn cũ)
     await client.query(`
       CREATE TABLE IF NOT EXISTS orders (
-        order_id VARCHAR(64) PRIMARY KEY,
-        telegram_id VARCHAR(64) NOT NULL,
+        id SERIAL PRIMARY KEY,
+        order_id VARCHAR(64),
+        order_code VARCHAR(64),
+        telegram_id VARCHAR(64),
         username VARCHAR(255),
         order_type VARCHAR(32) DEFAULT 'BOOKS',
         items JSONB DEFAULT '[]'::jsonb,
-        original_amount INT NOT NULL,
-        final_amount INT NOT NULL,
+        books TEXT,
+        original_amount INT,
+        final_amount INT,
+        amount BIGINT,
         discount_lines JSONB DEFAULT '[]'::jsonb,
         status VARCHAR(32) DEFAULT 'PENDING',
         sepay_trans_id VARCHAR(128),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        expires_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '15 minutes',
+        expires_at TIMESTAMP WITH TIME ZONE,
         paid_at TIMESTAMP WITH TIME ZONE
       );
+    `);
+
+    // Thêm các cột bổ trợ nếu bảng orders đã tồn tại từ trước mà chưa có
+    await client.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(64);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_code VARCHAR(64);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS username VARCHAR(255);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type VARCHAR(32) DEFAULT 'BOOKS';
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS books TEXT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS original_amount INT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS final_amount INT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS amount BIGINT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_lines JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS sepay_trans_id VARCHAR(128);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP WITH TIME ZONE;
+    `);
+
+    // Đồng bộ các đơn cũ nếu có
+    await client.query(`
+      UPDATE orders SET order_id = order_code WHERE order_id IS NULL AND order_code IS NOT NULL;
+      UPDATE orders SET final_amount = amount::int, original_amount = amount::int WHERE final_amount IS NULL AND amount IS NOT NULL;
+      UPDATE orders SET paid_at = created_at WHERE paid_at IS NULL AND status = 'completed';
     `);
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
       CREATE INDEX IF NOT EXISTS idx_orders_telegram ON orders(telegram_id);
+      CREATE INDEX IF NOT EXISTS idx_orders_order_id ON orders(order_id);
       CREATE INDEX IF NOT EXISTS idx_orders_expires ON orders(expires_at);
     `);
 

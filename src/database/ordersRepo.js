@@ -2,7 +2,7 @@ const pool = require('./connection');
 const { ORDER_STATUS, ORDER_TYPE } = require('../config/constants');
 
 /**
- * Tạo đơn hàng mới với thời hạn hiệu lực 15 phút
+ * Tạo đơn hàng mới với thời hạn hiệu lực 15 phút (Đồng bộ cả schema cũ và mới)
  */
 async function createOrder({
   orderId,
@@ -15,21 +15,25 @@ async function createOrder({
   discountLines = []
 }) {
   try {
+    const bookIdsStr = items.map(b => b.id).join(', ');
     const query = `
       INSERT INTO orders (
-        order_id, 
+        order_id,
+        order_code,
         telegram_id, 
         username, 
         order_type, 
-        items, 
+        items,
+        books,
         original_amount, 
-        final_amount, 
+        final_amount,
+        amount,
         discount_lines, 
         status, 
         created_at, 
         expires_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW() + INTERVAL '15 minutes')
+      VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, NOW(), NOW() + INTERVAL '15 minutes')
       RETURNING *
     `;
     const res = await pool.query(query, [
@@ -38,6 +42,7 @@ async function createOrder({
       username || null,
       orderType,
       JSON.stringify(items),
+      bookIdsStr,
       originalAmount,
       finalAmount,
       JSON.stringify(discountLines),
@@ -56,7 +61,10 @@ async function createOrder({
 async function getOrderById(orderId) {
   if (!orderId) return null;
   try {
-    const res = await pool.query('SELECT * FROM orders WHERE order_id = $1 LIMIT 1', [orderId]);
+    const res = await pool.query(
+      'SELECT * FROM orders WHERE order_id = $1 OR order_code = $1 LIMIT 1', 
+      [orderId]
+    );
     return res.rows[0] || null;
   } catch (err) {
     console.error('❌ Lỗi getOrderById:', err.message);
@@ -75,7 +83,7 @@ async function findPendingOrderByContent(content) {
       `SELECT * FROM orders 
        WHERE status = $1 
          AND expires_at > NOW() 
-         AND $2 LIKE ('%' || order_id || '%')
+         AND ($2 LIKE ('%' || order_id || '%') OR $2 LIKE ('%' || order_code || '%'))
        LIMIT 1`,
       [ORDER_STATUS.PENDING, upperContent]
     );
@@ -94,7 +102,7 @@ async function markOrderAsPaid(orderId, sepayTransId = null) {
     const res = await pool.query(
       `UPDATE orders 
        SET status = $1, paid_at = NOW(), sepay_trans_id = $2
-       WHERE order_id = $3
+       WHERE (order_id = $3 OR order_code = $3) AND status != $1
        RETURNING *`,
       [ORDER_STATUS.PAID, sepayTransId, orderId]
     );
@@ -128,7 +136,7 @@ async function getExpiredPendingOrders() {
 async function deleteOrder(orderId) {
   if (!orderId) return false;
   try {
-    await pool.query('DELETE FROM orders WHERE order_id = $1', [orderId]);
+    await pool.query('DELETE FROM orders WHERE order_id = $1 OR order_code = $1', [orderId]);
     return true;
   } catch (err) {
     console.error(`❌ Lỗi deleteOrder (${orderId}):`, err.message);
@@ -137,33 +145,33 @@ async function deleteOrder(orderId) {
 }
 
 /**
- * Thống kê doanh thu cho Admin
+ * Thống kê doanh thu cho Admin (tính cả 732 đơn lịch sử completed và đơn mới PAID)
  */
 async function getRevenueStats() {
   try {
     const totalQuery = await pool.query(
       `SELECT 
-        COALESCE(SUM(final_amount), 0) as total_revenue,
+        COALESCE(SUM(COALESCE(final_amount, amount::int)), 0) as total_revenue,
         COUNT(*) as total_orders
-       FROM orders WHERE status = $1`,
+       FROM orders WHERE status IN ($1, 'completed')`,
       [ORDER_STATUS.PAID]
     );
 
     const todayQuery = await pool.query(
       `SELECT 
-        COALESCE(SUM(final_amount), 0) as today_revenue,
+        COALESCE(SUM(COALESCE(final_amount, amount::int)), 0) as today_revenue,
         COUNT(*) as today_orders
        FROM orders 
-       WHERE status = $1 AND paid_at >= CURRENT_DATE`,
+       WHERE status IN ($1, 'completed') AND (paid_at >= CURRENT_DATE OR created_at >= CURRENT_DATE)`,
       [ORDER_STATUS.PAID]
     );
 
     const monthQuery = await pool.query(
       `SELECT 
-        COALESCE(SUM(final_amount), 0) as month_revenue,
+        COALESCE(SUM(COALESCE(final_amount, amount::int)), 0) as month_revenue,
         COUNT(*) as month_orders
        FROM orders 
-       WHERE status = $1 AND paid_at >= date_trunc('month', CURRENT_DATE)`,
+       WHERE status IN ($1, 'completed') AND (paid_at >= date_trunc('month', CURRENT_DATE) OR created_at >= date_trunc('month', CURRENT_DATE))`,
       [ORDER_STATUS.PAID]
     );
 
