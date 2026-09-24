@@ -1,0 +1,67 @@
+const QRCode = require('qrcode');
+const { VietQr } = require('dynamic-vietqr');
+const { BANK_ACCOUNT_NO, BANK_BIN } = require('../config/env');
+
+/**
+ * Sinh Buffer ảnh mã QR VietQR chuẩn nội bộ
+ */
+async function generateQRCodeBuffer(amount, description) {
+  try {
+    const vietqr = new VietQr(BANK_ACCOUNT_NO, BANK_BIN);
+    const payload = vietqr.dynamicIBFTToAccount(
+      amount.toString(),
+      description
+    );
+
+    const qrBuffer = await QRCode.toBuffer(payload, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 360,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+
+    return qrBuffer;
+  } catch (err) {
+    console.error('❌ Lỗi tạo QR Code Buffer:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Gửi ảnh QR Code tới Telegram user kèm chú thích
+ */
+async function sendQRCode(bot, chatId, amount, content, caption, replyMarkup = null) {
+  try {
+    const qrBuffer = await generateQRCodeBuffer(amount, content);
+    const options = {
+      caption,
+      parse_mode: 'Markdown'
+    };
+    if (replyMarkup) {
+      options.reply_markup = replyMarkup;
+    }
+    await bot.sendPhoto(chatId, qrBuffer, options);
+    console.log(`✔ Đã gửi ảnh QR Code đơn [${content}] tới ChatID: ${chatId}`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Gửi QR thất bại tới ${chatId}:`, err.message);
+    try {
+      await bot.sendMessage(
+        chatId,
+        `⚠️ Đã xảy ra lỗi khi tạo mã QR đơn hàng. Vui lòng bấm vào giỏ hàng để tạo lại đơn nhé.`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (e) {
+      // ignore
+    }
+    return false;
+  }
+}
+
+module.exports = {
+  generateQRCodeBuffer,
+  sendQRCode
+};

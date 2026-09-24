@@ -1,0 +1,126 @@
+{
+  "communities": {
+    "0": [
+      "bot",
+      "bot_addtovip",
+      "bot_app",
+      "bot_bodyparser",
+      "bot_bot",
+      "bot_createorderid",
+      "bot_express",
+      "bot_incrementsoldquantity",
+      "bot_orders",
+      "bot_pool",
+      "bot_qrcode",
+      "bot_sendbooklinks",
+      "bot_sendqrcode",
+      "bot_telegrambot",
+      "bot_vietqr"
+    ],
+    "1": [
+      "package",
+      "package_author",
+      "package_description",
+      "package_keywords",
+      "package_license",
+      "package_main",
+      "package_name",
+      "package_version",
+      "ref_body_parser",
+      "ref_dynamic_vietqr",
+      "ref_express",
+      "ref_node_telegram_bot_api",
+      "ref_pg",
+      "ref_qrcode"
+    ],
+    "2": [
+      "package_dependencies",
+      "package_dependencies_body_parser",
+      "package_dependencies_dynamic_vietqr",
+      "package_dependencies_express",
+      "package_dependencies_node_telegram_bot_api",
+      "package_dependencies_pg",
+      "package_dependencies_qrcode"
+    ],
+    "3": [
+      "bot_generatelistpage",
+      "bot_getactiveevent",
+      "bot_getbooks",
+      "bot_getpagenumberbuttons",
+      "bot_isuservip"
+    ],
+    "4": [
+      "bot_calculatefinalprice",
+      "bot_getactiveeventdiscountpercent"
+    ],
+    "5": [
+      "package_scripts",
+      "package_scripts_start"
+    ]
+  },
+  "cohesion": {
+    "0": 0.13333333333333333,
+    "1": 0.14285714285714285,
+    "2": 0.2857142857142857,
+    "3": 0.4,
+    "4": 1.0,
+    "5": 1.0
+  },
+  "gods": [
+    {
+      "id": "bot_generatelistpage",
+      "label": "generateListPage()",
+      "degree": 5
+    },
+    {
+      "id": "bot_isuservip",
+      "label": "isUserVIP()",
+      "degree": 2
+    },
+    {
+      "id": "bot_getbooks",
+      "label": "getBooks()",
+      "degree": 2
+    },
+    {
+      "id": "bot_getactiveeventdiscountpercent",
+      "label": "getActiveEventDiscountPercent()",
+      "degree": 2
+    },
+    {
+      "id": "bot_getactiveevent",
+      "label": "getActiveEvent()",
+      "degree": 2
+    },
+    {
+      "id": "bot_calculatefinalprice",
+      "label": "calculateFinalPrice()",
+      "degree": 2
+    },
+    {
+      "id": "bot_getpagenumberbuttons",
+      "label": "getPageNumberButtons()",
+      "degree": 2
+    },
+    {
+      "id": "package_scripts",
+      "label": "scripts",
+      "degree": 2
+    },
+    {
+      "id": "ref_body_parser",
+      "label": "body-parser",
+      "degree": 2
+    },
+    {
+      "id": "ref_dynamic_vietqr",
+      "label": "dynamic-vietqr",
+      "degree": 2
+    }
+  ],
+  "surprises": [],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}
