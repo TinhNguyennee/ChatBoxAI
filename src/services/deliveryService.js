@@ -33,14 +33,13 @@ async function sendBookLinks(bot, chatId, books, isFree = false) {
       text += `\n━━━━━━━━━━━━━━━━━━━━\n`;
       text += `📖 <b>#${b.id}. ${escapeHtml(b.name)}</b>\n`;
 
-      let linkToUse = b.link || '';
-      if (!linkToUse) {
-        text += `⚠️ <i>(Link đang cập nhật, vui lòng liên hệ ${SUPPORT_USERNAME})</i>\n`;
+      const validLinks = extractLinks(b.link);
+      if (validLinks.length === 0) {
+        text += `✅ <i>Đã được cập nhật vào Tủ truyện của bạn!</i>\n`;
       } else {
-        let linkParts = linkToUse.split(',').map(p => p.trim());
-        linkParts.forEach((part, j) => {
-          const partLabel = linkParts.length > 1 ? `Link Part ${j + 1}` : `Link đọc truyện`;
-          text += `🔗 ${partLabel}: <a href="${part}">Bấm vào đây để đọc</a>\n`;
+        validLinks.forEach((item) => {
+          const partLabel = validLinks.length > 1 ? `Link ${item.label}` : `Link đọc truyện`;
+          text += `🔗 ${partLabel}: <a href="${item.url}">👉 Bấm vào đây để đọc</a>\n`;
         });
       }
     });
@@ -49,17 +48,20 @@ async function sendBookLinks(bot, chatId, books, isFree = false) {
     if (partNumber < totalParts) {
       text += `<i>(Còn tiếp phần sau...)</i>\n\n`;
     } else {
-      text += `💡 <b>Mẹo:</b> Dùng app Google Docs để đọc mượt nhất. Bạn có thể mở lại bất cứ lúc nào trong mục <b>Tủ truyện của tôi</b>.\nCó vấn đề gì nhắn ${SUPPORT_USERNAME} nhé! Chúc bạn đọc truyện vui vẻ! 🔥`;
+      text += `💡 <b>Mẹo:</b> Dùng app Google Docs để đọc mượt nhất. Bạn có thể mở lại bất cứ lúc nào trong mục <b>Tủ truyện của tôi</b>.\nChúc bạn đọc truyện thật vui vẻ! 🔥`;
     }
 
     // Tạo các nút bấm tương tác nhanh bên dưới tin nhắn
     const inlineButtons = [];
     chunk.forEach(b => {
-      let mainLink = (b.link || '').split(',')[0].trim();
-      if (mainLink && mainLink.startsWith('http')) {
-        const shortTitle = b.name.length > 18 ? b.name.substring(0, 16) + '...' : b.name;
-        inlineButtons.push([{ text: `📖 Đọc: #${b.id}. ${shortTitle}`, url: mainLink }]);
-      }
+      const validLinks = extractLinks(b.link);
+      validLinks.forEach(item => {
+        const shortTitle = b.name.length > 16 ? b.name.substring(0, 14) + '..' : b.name;
+        const btnText = validLinks.length > 1
+          ? `📖 #${b.id} (${item.label})`
+          : `📖 Đọc #${b.id}. ${shortTitle}`;
+        inlineButtons.push([{ text: btnText, url: item.url }]);
+      });
     });
 
     if (partNumber === totalParts) {
@@ -90,6 +92,24 @@ async function sendBookLinks(bot, chatId, books, isFree = false) {
       await new Promise(r => setTimeout(r, 1200));
     }
   }
+}
+
+function extractLinks(linkStr) {
+  if (!linkStr) return [];
+  const rawParts = String(linkStr).split(/,|\n/).map(p => p.trim()).filter(Boolean);
+  const links = [];
+
+  rawParts.forEach((part, idx) => {
+    const urlMatch = part.match(/(https?:\/\/[^\s)"]+)/i);
+    if (urlMatch) {
+      const url = urlMatch[1];
+      const labelMatch = part.match(/\(([^)]+)\)/);
+      const label = labelMatch ? labelMatch[1] : (rawParts.length > 1 ? `Phần ${idx + 1}` : 'Đọc ngay');
+      links.push({ url, label });
+    }
+  });
+
+  return links;
 }
 
 function escapeHtml(str) {

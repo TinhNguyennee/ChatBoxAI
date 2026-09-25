@@ -2,7 +2,7 @@ const { SEPAY_API_KEY, SUPPORT_USERNAME } = require('../config/env');
 const { ORDER_TYPE } = require('../config/constants');
 const { findPendingOrderByContent, markOrderAsPaid } = require('../database/ordersRepo');
 const { addToVIP } = require('../database/vipRepo');
-const { incrementSoldQuantity } = require('../database/booksRepo');
+const { incrementSoldQuantity, getBookById } = require('../database/booksRepo');
 const { addPurchases } = require('../database/purchasesRepo');
 const { removeFromCart } = require('../database/cartRepo');
 const { cancelExpirationTimer } = require('./orderExpirationService');
@@ -92,8 +92,12 @@ async function processSepayWebhook(bot, reqBody, authHeader) {
         await removeFromCart(chatId, id);
       }
 
+      // Lấy thông tin sách đầy đủ (có link Google Docs chuẩn) từ database/cache
+      const fullBooks = await Promise.all(bookIds.map(id => getBookById(id)));
+      const booksToDeliver = fullBooks.filter(Boolean);
+
       // Gửi link truyện tự động cho khách kèm các nút bấm mở đọc liền
-      await sendBookLinks(bot, chatId, items, false);
+      await sendBookLinks(bot, chatId, booksToDeliver.length > 0 ? booksToDeliver : items, false);
     }
   } catch (err) {
     console.error(`❌ Lỗi sau thanh toán đơn ${orderId}:`, err.message);

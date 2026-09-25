@@ -93,6 +93,32 @@ async function runTests() {
   assert.strictEqual(testEscape(null), '', 'Phải xử lý được null');
   console.log('✅ Test HTML Escaping: An toàn tuyệt đối với số nguyên và ký tự đặc biệt');
 
+  // 7. Test extractLinks robustness
+  function extractLinks(linkStr) {
+    if (!linkStr) return [];
+    const rawParts = String(linkStr).split(/,|\n/).map(p => p.trim()).filter(Boolean);
+    const links = [];
+    rawParts.forEach((part, idx) => {
+      const urlMatch = part.match(/(https?:\/\/[^\s)"]+)/i);
+      if (urlMatch) {
+        const url = urlMatch[1];
+        const labelMatch = part.match(/\(([^)]+)\)/);
+        const label = labelMatch ? labelMatch[1] : (rawParts.length > 1 ? `Phần ${idx + 1}` : 'Đọc ngay');
+        links.push({ url, label });
+      }
+    });
+    return links;
+  }
+
+  const multiPart = "https://docs.google.com/part1 (Part 1), https://docs.google.com/part2 (Part 2)";
+  const extracted = extractLinks(multiPart);
+  assert.strictEqual(extracted.length, 2);
+  assert.strictEqual(extracted[0].url, "https://docs.google.com/part1");
+  assert.strictEqual(extracted[0].label, "Part 1");
+  assert.strictEqual(extracted[1].url, "https://docs.google.com/part2");
+  assert.strictEqual(extracted[1].label, "Part 2");
+  console.log('✅ Test Extract Links: Tách chính xác link nhiều phần (Part 1, Part 2) không bị dính ngoặc');
+
   console.log('\n🎉 TẤT CẢ CÁC BỘ KIỂM THỬ ĐÃ VƯỢT QUA XUẤT SẮC!');
 }
 

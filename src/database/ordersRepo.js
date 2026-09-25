@@ -138,7 +138,10 @@ async function getExpiredPendingOrders() {
 async function deleteOrder(orderId) {
   if (!orderId) return false;
   try {
-    await pool.query('DELETE FROM orders WHERE order_id = $1 OR order_code = $1', [orderId]);
+    await pool.query(
+      'DELETE FROM orders WHERE (order_id = $1 OR order_code = $1) AND status = $2',
+      [orderId, ORDER_STATUS.PENDING]
+    );
     return true;
   } catch (err) {
     console.error(`❌ Lỗi deleteOrder (${orderId}):`, err.message);

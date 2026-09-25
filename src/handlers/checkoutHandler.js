@@ -58,7 +58,7 @@ async function handleCheckoutCart(bot, callbackQuery) {
       telegramId: chatId,
       username,
       orderType: ORDER_TYPE.BOOKS,
-      items: cartItems.map(b => ({ id: b.id, name: b.name, price: b.price })),
+      items: cartItems.map(b => ({ id: b.id, name: b.name, price: b.price, link: b.link })),
       originalAmount: totalOriginal,
       finalAmount,
       discountLines: discountBreakdown
@@ -206,6 +206,16 @@ async function handleCheckOrder(bot, callbackQuery, orderId) {
     }
 
     if (order.status === ORDER_STATUS.PAID || order.status === 'completed') {
+      await bot.editMessageReplyMarkup({
+        inline_keyboard: [
+          [{ text: "✅ ĐÃ THANH TOÁN THÀNH CÔNG", callback_data: "noop" }],
+          [{ text: "📚 Mở Tủ Truyện Của Tôi", callback_data: "my_books:1" }]
+        ]
+      }, {
+        chat_id: chatId,
+        message_id: callbackQuery.message.message_id
+      }).catch(() => {});
+
       return bot.answerCallbackQuery(callbackQuery.id, {
         text: '✅ Đơn hàng đã được thanh toán thành công!',
         show_alert: true
@@ -224,16 +234,65 @@ async function handleCheckOrder(bot, callbackQuery, orderId) {
 }
 
 /**
- * Hủy đơn hàng thủ công
+ * Hủy đơn hàng thủ công (Bảo vệ tuyệt đối: Không cho hủy nếu đơn đã thanh toán)
  */
 async function handleCancelOrder(bot, callbackQuery, orderId) {
   const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
+
   try {
+    const order = await getOrderById(orderId);
+    if (!order) {
+      markOrderAsExpiredInCache(orderId);
+      return bot.answerCallbackQuery(callbackQuery.id, {
+        text: '⚠️ Đơn hàng này không tồn tại hoặc đã bị hủy trước đó.',
+        show_alert: true
+      }).catch(() => {});
+    }
+
+    // ⛔ CHẶN HỦY NẾU ĐƠN ĐÃ THANH TOÁN
+    if (order.status === ORDER_STATUS.PAID || order.status === 'completed') {
+      // Cập nhật lại nút bấm trên tin nhắn QR để bỏ hoàn toàn nút hủy
+      await bot.editMessageReplyMarkup({
+        inline_keyboard: [
+          [{ text: "✅ ĐÃ THANH TOÁN THÀNH CÔNG", callback_data: "noop" }],
+          [{ text: "📚 Mở Tủ Truyện Của Tôi", callback_data: "my_books:1" }]
+        ]
+      }, {
+        chat_id: chatId,
+        message_id: messageId
+      }).catch(() => {});
+
+      return bot.answerCallbackQuery(callbackQuery.id, {
+        text: '⛔ Đơn hàng này đã được thanh toán thành công, bạn không thể hủy!',
+        show_alert: true
+      }).catch(() => {});
+    }
+
+    // Đơn hợp lệ đang PENDING -> tiến hành hủy
     cancelExpirationTimer(orderId);
     markOrderAsExpiredInCache(orderId);
     await deleteOrder(orderId);
+
+    // Cập nhật tin nhắn hóa đơn thành trạng thái đã hủy
+    await bot.editMessageCaption(
+      `❌ <b>ĐƠN HÀNG [${orderId}] ĐÃ ĐƯỢC BẠN HỦY.</b>\nNếu muốn mua lại, bạn vui lòng chọn lại truyện trong danh mục.`,
+      {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📚 Khám Phá Kho Truyện", callback_data: "nav_list:1" }],
+            [{ text: "🏠 Menu Chính", callback_data: "nav_main" }]
+          ]
+        }
+      }
+    ).catch(async () => {
+      await bot.sendMessage(chatId, `✅ Đơn hàng <code>${orderId}</code> đã được hủy.`, { parse_mode: 'HTML' });
+    });
+
     await bot.answerCallbackQuery(callbackQuery.id, { text: '🗑️ Đã hủy đơn hàng thành công!' }).catch(() => {});
-    await bot.sendMessage(chatId, `✅ Đơn hàng <code>${orderId}</code> đã được hủy.`, { parse_mode: 'HTML' });
   } catch (err) {
     console.error('❌ Lỗi handleCancelOrder:', err.message);
   }
