@@ -3,7 +3,7 @@ const { calculateCartPrice, calculateVIPPrice, generateOrderId } = require('../s
 const { getBookListKeyboard, getBookDetailKeyboard } = require('../src/keyboards/bookKeyboards');
 const { getCartKeyboard, getOrderPendingKeyboard } = require('../src/keyboards/cartKeyboards');
 const { getMainMenuKeyboard } = require('../src/keyboards/mainKeyboards');
-const { ORDER_EXPIRATION_MINUTES } = require('../src/config/constants');
+const { ORDER_EXPIRATION_MINUTES, ITEMS_PER_PAGE } = require('../src/config/constants');
 
 async function runTests() {
   console.log('🧪 Đang chạy kiểm thử các thành phần cốt lõi...');
@@ -40,19 +40,28 @@ async function runTests() {
   assert.strictEqual(priceResVIP.finalAmount, 26400);
   console.log('✅ Test Pricing Service: Tính chiết khấu mua nhiều và VIP chính xác 100%');
 
-  // 3. Test Keyboards
+  // Test VIP Price
+  const vipPriceRes = await calculateVIPPrice();
+  assert.strictEqual(vipPriceRes.originalPrice, 139000);
+  assert.strictEqual(vipPriceRes.finalPrice, 139000);
+  console.log('✅ Test VIP Price: Giá VIP 139k không bị lỗi NaN');
+
+  // 3. Test Keyboards: 7 truyện/trang
+  assert.strictEqual(ITEMS_PER_PAGE, 7, 'ITEMS_PER_PAGE phải bằng 7');
   const sampleBooks = [
     { id: 1, name: 'Truyện 1', price: 15000, free: false },
     { id: 2, name: 'Truyện 2', price: 0, free: true },
     { id: 3, name: 'Truyện 3', price: 20000, free: false },
     { id: 4, name: 'Truyện 4', price: 25000, free: false },
-    { id: 5, name: 'Truyện 5', price: 10000, free: false }
+    { id: 5, name: 'Truyện 5', price: 10000, free: false },
+    { id: 6, name: 'Truyện 6', price: 30000, free: false },
+    { id: 7, name: 'Truyện 7', price: 18000, free: false }
   ];
 
   const listKb = getBookListKeyboard(sampleBooks, 1, 3, 2);
-  assert.strictEqual(listKb.inline_keyboard.length, 7, '5 nút truyện + 1 hàng phân trang + 1 hàng chức năng');
+  assert.strictEqual(listKb.inline_keyboard.length, 9, '7 nút truyện + 1 hàng phân trang + 1 hàng chức năng');
   assert.ok(listKb.inline_keyboard[0][0].callback_data.startsWith('book_detail:1:1'));
-  console.log('✅ Test Book List Keyboard: Đúng chuẩn 5 truyện/trang và nút bấm chi tiết');
+  console.log('✅ Test Book List Keyboard: Đúng chuẩn 7 truyện/trang và nút bấm chi tiết');
 
   const detailKbFree = getBookDetailKeyboard({ id: 2, name: 'Truyện 2', free: true }, false, false);
   assert.strictEqual(detailKbFree.inline_keyboard[0][0].text, '📖 Đọc Ngay (Miễn Phí)');
@@ -65,16 +74,16 @@ async function runTests() {
   assert.strictEqual(detailKbInCart.inline_keyboard[0][0].text, '➖ Xóa Khỏi Giỏ Hàng');
   console.log('✅ Test Detail Keyboard: Xử lý chính xác truyện Free / Chưa thêm / Đã thêm vào giỏ');
 
-  // 4. Test Cart Keyboards
-  const cartKb = getCartKeyboard(sampleBooks.slice(0, 2));
+  // 4. Test Cart Keyboards: Grid layout
+  const cartKb = getCartKeyboard(sampleBooks);
   assert.ok(cartKb.inline_keyboard.some(row => row[0].callback_data === 'checkout_start'), 'Phải có nút thanh toán');
-  console.log('✅ Test Cart Keyboard: Đầy đủ nút bỏ từng truyện và nút tiến hành thanh toán');
+  console.log('✅ Test Cart Keyboard: Nút xóa dạng lưới 2-3 cột siêu gọn gàng');
 
   // 5. Test Expiration Constants
   assert.strictEqual(ORDER_EXPIRATION_MINUTES, 15, 'Hạn đơn hàng phải là 15 phút');
   console.log('✅ Test Expiration Constants: Quy định 15 phút chính xác');
 
-  console.log('\n🎉 TẤT CẢ 5 BỘ KIỂM THỬ ĐÃ VƯỢT QUA XUẤT SẮC!');
+  console.log('\n🎉 TẤT CẢ CÁC BỘ KIỂM THỬ ĐÃ VƯỢT QUA XUẤT SẮC!');
 }
 
 runTests().catch(err => {

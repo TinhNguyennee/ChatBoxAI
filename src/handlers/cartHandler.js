@@ -5,68 +5,77 @@ const { getCartKeyboard } = require('../keyboards/cartKeyboards');
 const { handleBookDetail } = require('./listHandler');
 
 /**
- * Hiển thị màn hình Giỏ hàng chi tiết kèm bảng tính giá
+ * Hiển thị màn hình Giỏ hàng chi tiết kèm bảng tính giá (Gọn gàng, thoáng đãng, chống tràn)
  */
 async function handleViewCart(bot, chatId, messageId = null) {
   try {
-    const cartItems = await getCart(chatId);
-    const isVIP = await isUserVIP(chatId);
+    const [cartItems, isVIP] = await Promise.all([
+      getCart(chatId),
+      isUserVIP(chatId)
+    ]);
 
     if (cartItems.length === 0) {
       const emptyText = 
-        `🛒 **GIỎ HÀNG CỦA BẠN ĐANG TRỐNG**\n\n` +
+        `🛒 <b>GIỎ HÀNG CỦA BẠN ĐANG TRỐNG</b>\n\n` +
         `Bạn chưa chọn cuốn truyện nào. Hãy duyệt danh sách truyện và thêm vào giỏ nhé!`;
       const keyboard = getCartKeyboard([]);
 
+      const options = {
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      };
+
       if (messageId) {
         return bot.editMessageText(emptyText, {
-          chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: keyboard
+          chat_id: chatId, message_id: messageId, ...options
         }).catch(async () => {
-          await bot.sendMessage(chatId, emptyText, { parse_mode: 'Markdown', reply_markup: keyboard });
+          await bot.sendMessage(chatId, emptyText, options);
         });
       }
-      return bot.sendMessage(chatId, emptyText, { parse_mode: 'Markdown', reply_markup: keyboard });
+      return bot.sendMessage(chatId, emptyText, options);
     }
 
     const { totalOriginal, finalAmount, discountBreakdown } = await calculateCartPrice(cartItems, isVIP);
 
-    let text = `🛒 **GIỎ HÀNG CỦA BẠN (${cartItems.length} cuốn)**\n\n`;
-    text += `📋 **Các truyện đã chọn:**\n`;
+    let text = `🛒 <b>GIỎ HÀNG CỦA BẠN (${cartItems.length} cuốn)</b>\n\n`;
+    text += `📋 <b>Danh sách truyện đã chọn:</b>\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
     cartItems.forEach((b, idx) => {
       const priceStr = b.free ? "🆓 Free" : `${b.price.toLocaleString('vi-VN')}đ`;
-      text += `${idx + 1}. #${b.id} *${b.name}* — ${priceStr}\n`;
+      const shortName = b.name.length > 25 ? b.name.substring(0, 23) + '..' : b.name;
+      text += `${idx + 1}. #${b.id} <b>${escapeHtml(shortName)}</b> — <code>${priceStr}</code>\n`;
     });
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
 
-    text += `\n──────────────\n`;
-    text += `💰 **Tổng giá gốc:** ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
+    text += `💰 <b>Tổng giá gốc:</b> ${totalOriginal.toLocaleString('vi-VN')}đ\n`;
 
     if (discountBreakdown.length > 0) {
-      text += `\n🎁 **Ưu đãi áp dụng:**\n`;
+      text += `\n🎁 <b>Ưu đãi áp dụng:</b>\n`;
       discountBreakdown.forEach(line => {
-        text += `• ${line}\n`;
+        text += `• ${escapeHtml(line)}\n`;
       });
     }
 
-    text += `\n💳 **SỐ TIỀN CẦN THANH TOÁN:** \`${finalAmount.toLocaleString('vi-VN')}đ\`\n`;
-    text += `──────────────\n`;
-    text += `👉 *Bấm "Tiến Hành Thanh Toán" để nhận mã QR chuyển khoản MB Bank (thời hạn 15 phút).*`;
+    text += `\n💳 <b>SỐ TIỀN CẦN THANH TOÁN:</b> <code>${finalAmount.toLocaleString('vi-VN')}đ</code>\n\n`;
+    text += `👉 <i>Bấm các nút ❌ để bỏ bớt truyện hoặc bấm "TIẾN HÀNH THANH TOÁN" để nhận mã VietQR MB Bank (thời hạn 15 phút).</i>`;
 
     const keyboard = getCartKeyboard(cartItems);
+
+    const options = {
+      parse_mode: 'HTML',
+      reply_markup: keyboard
+    };
 
     if (messageId) {
       await bot.editMessageText(text, {
         chat_id: chatId,
         message_id: messageId,
-        parse_mode: 'Markdown',
-        reply_markup: keyboard
+        ...options
       }).catch(async () => {
-        await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: keyboard });
+        await bot.sendMessage(chatId, text, options);
       });
     } else {
-      await bot.sendMessage(chatId, text, {
-        parse_mode: 'Markdown',
-        reply_markup: keyboard
-      });
+      await bot.sendMessage(chatId, text, options);
     }
   } catch (err) {
     console.error('❌ Lỗi handleViewCart:', err.message);
@@ -80,7 +89,6 @@ async function handleAddToCart(bot, callbackQuery, bookId, fromPage = 1) {
   const chatId = callbackQuery.message.chat.id;
   await addToCart(chatId, bookId);
   await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Đã thêm vào giỏ hàng!' }).catch(() => {});
-  // Cập nhật lại giao diện chi tiết truyện
   await handleBookDetail(bot, chatId, bookId, fromPage, callbackQuery.message.message_id);
 }
 
@@ -91,7 +99,6 @@ async function handleRemoveFromCart(bot, callbackQuery, bookId, fromPage = 1) {
   const chatId = callbackQuery.message.chat.id;
   await removeFromCart(chatId, bookId);
   await bot.answerCallbackQuery(callbackQuery.id, { text: '🗑️ Đã xóa khỏi giỏ hàng!' }).catch(() => {});
-  // Cập nhật lại giao diện chi tiết truyện
   await handleBookDetail(bot, chatId, bookId, fromPage, callbackQuery.message.message_id);
 }
 
@@ -113,6 +120,15 @@ async function handleClearCart(bot, callbackQuery) {
   await clearCart(chatId);
   await bot.answerCallbackQuery(callbackQuery.id, { text: '🗑️ Đã dọn sạch giỏ hàng!' }).catch(() => {});
   await handleViewCart(bot, chatId, callbackQuery.message.message_id);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 module.exports = {

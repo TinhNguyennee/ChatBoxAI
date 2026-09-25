@@ -1,17 +1,25 @@
 /**
- * Bàn phím thao tác trong Giỏ hàng
+ * Bàn phím thao tác trong Giỏ hàng (Sắp xếp dạng lưới 2-3 cột siêu gọn gàng, chống tràn màn hình)
  */
 function getCartKeyboard(cartItems) {
   const keyboard = [];
 
-  // Nút xóa từng truyện nếu có trong giỏ
   if (cartItems.length > 0) {
-    cartItems.forEach((book) => {
-      const shortName = book.name.length > 20 ? book.name.substring(0, 18) + '...' : book.name;
-      keyboard.push([
-        { text: `❌ Bỏ: #${book.id}. ${shortName}`, callback_data: `cart_drop:${book.id}` }
-      ]);
-    });
+    // Nhóm các nút xóa truyện thành hàng 2 hoặc 3 nút ngắn gọn
+    const ITEMS_PER_ROW = cartItems.length > 6 ? 3 : 2;
+    for (let i = 0; i < cartItems.length; i += ITEMS_PER_ROW) {
+      const row = [];
+      for (let j = i; j < Math.min(i + ITEMS_PER_ROW, cartItems.length); j++) {
+        const book = cartItems[j];
+        const shortName = book.name.length > 10 ? book.name.substring(0, 9) + '..' : book.name;
+        const btnText = ITEMS_PER_ROW === 3 ? `❌ #${book.id}` : `❌ #${book.id} ${shortName}`;
+        row.push({
+          text: btnText,
+          callback_data: `cart_drop:${book.id}`
+        });
+      }
+      keyboard.push(row);
+    }
 
     // Nút thanh toán nổi bật
     keyboard.push([

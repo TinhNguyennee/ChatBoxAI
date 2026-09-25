@@ -62,11 +62,19 @@ async function processSepayWebhook(bot, reqBody, authHeader) {
       await addToVIP(chatId);
       await bot.sendMessage(
         chatId,
-        `🎉 **THANH TOÁN VIP THÀNH CÔNG!**\n\n` +
-        `💎 Bạn đã chính thức trở thành **VIP Member vĩnh viễn**.\n` +
-        `Từ nay mọi lần mua truyện bạn sẽ được **giảm 50%** tự động.\n\n` +
+        `🎉 <b>THANH TOÁN VIP THÀNH CÔNG!</b>\n\n` +
+        `💎 Bạn đã chính thức trở thành <b>VIP Member vĩnh viễn</b>.\n` +
+        `Từ nay mọi lần mua truyện bạn sẽ được <b>giảm 50%</b> tự động.\n\n` +
         `Cảm ơn bạn đã đồng hành cùng Truyện Ếch Xanh! 🔥`,
-        { parse_mode: 'Markdown' }
+        { 
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "📚 Khám Phá Kho Truyện (Giảm 50%)", callback_data: "nav_list:1" }],
+              [{ text: "🏠 Về Menu Chính", callback_data: "nav_main" }]
+            ]
+          }
+        }
       );
     } else {
       // Đơn mua truyện
@@ -84,7 +92,7 @@ async function processSepayWebhook(bot, reqBody, authHeader) {
         await removeFromCart(chatId, id);
       }
 
-      // Gửi link truyện tự động cho khách
+      // Gửi link truyện tự động cho khách kèm các nút bấm mở đọc liền
       await sendBookLinks(bot, chatId, items, false);
     }
   } catch (err) {

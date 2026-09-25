@@ -1,4 +1,5 @@
 const { getOrderById, deleteOrder, getExpiredPendingOrders } = require('../database/ordersRepo');
+const { markOrderAsExpiredInCache } = require('../database/cache');
 const { ORDER_STATUS } = require('../config/constants');
 
 const activeTimers = new Map();
@@ -58,6 +59,7 @@ async function handleOrderExpired(bot, orderId, chatId) {
 
     // 2. Xóa đơn khỏi bảng orders để tiết kiệm dung lượng lưu trữ Neon DB
     await deleteOrder(orderId);
+    markOrderAsExpiredInCache(orderId);
     console.log(`🗑️ Đã xóa đơn hết hạn [${orderId}] khỏi cơ sở dữ liệu.`);
   } catch (err) {
     console.error(`❌ Lỗi khi xử lý đơn hết hạn (${orderId}):`, err.message);

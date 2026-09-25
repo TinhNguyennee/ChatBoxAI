@@ -31,14 +31,14 @@ async function generateQRCodeBuffer(amount, description) {
 }
 
 /**
- * Gửi ảnh QR Code tới Telegram user kèm chú thích
+ * Gửi ảnh QR Code tới Telegram user kèm chú thích (Hỗ trợ HTML mode an toàn)
  */
-async function sendQRCode(bot, chatId, amount, content, caption, replyMarkup = null) {
+async function sendQRCode(bot, chatId, amount, content, caption, replyMarkup = null, parseMode = 'HTML') {
   try {
     const qrBuffer = await generateQRCodeBuffer(amount, content);
     const options = {
       caption,
-      parse_mode: 'Markdown'
+      parse_mode: parseMode
     };
     if (replyMarkup) {
       options.reply_markup = replyMarkup;
@@ -51,8 +51,7 @@ async function sendQRCode(bot, chatId, amount, content, caption, replyMarkup = n
     try {
       await bot.sendMessage(
         chatId,
-        `⚠️ Đã xảy ra lỗi khi tạo mã QR đơn hàng. Vui lòng bấm vào giỏ hàng để tạo lại đơn nhé.`,
-        { parse_mode: 'Markdown' }
+        `⚠️ Đã xảy ra lỗi khi gửi mã QR đơn hàng. Vui lòng bấm vào giỏ hàng để tạo lại đơn nhé.`
       );
     } catch (e) {
       // ignore

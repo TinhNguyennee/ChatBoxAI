@@ -23,7 +23,7 @@ async function handleAdminDashboard(bot, chatId, messageId = null) {
   }
 
   const text = 
-    `👑 **BẢNG ĐIỀU KHIỂN QUẢN TRỊ VIÊN (ADMIN)**\n\n` +
+    `👑 <b>BẢNG ĐIỀU KHIỂN QUẢN TRỊ VIÊN (ADMIN)</b>\n\n` +
     `Chào mừng Admin! Bạn có thể xem thống kê kinh doanh, quản lý sự kiện khuyến mại hoặc gửi tin nhắn thông báo hàng loạt tại đây:`;
 
   const keyboard = getAdminDashboardKeyboard();
@@ -32,46 +32,48 @@ async function handleAdminDashboard(bot, chatId, messageId = null) {
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: keyboard
     }).catch(async () => {
-      await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: keyboard });
+      await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
     });
   } else {
     await bot.sendMessage(chatId, text, {
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: keyboard
     });
   }
 }
 
 /**
- * Hiển thị báo cáo thống kê doanh thu
+ * Hiển thị báo cáo thống kê doanh thu (Top truyện đã lọc bỏ truyện Free)
  */
 async function handleAdminStats(bot, chatId, messageId = null) {
   if (!checkIsAdmin(chatId)) return;
 
-  const stats = await getRevenueStats();
-  const totalUsers = await getUserCount();
-  const vipCount = await getVIPCount();
-  const topBooks = await getTopSellingBooks(5);
+  const [stats, totalUsers, vipCount, topBooks] = await Promise.all([
+    getRevenueStats(),
+    getUserCount(),
+    getVIPCount(),
+    getTopSellingBooks(5)
+  ]);
 
-  let text = `📊 **BÁO CÁO THỐNG KÊ DOANH THU & HOẠT ĐỘNG**\n\n`;
-  text += `💵 **Doanh thu hôm nay:** \`${stats.todayRevenue.toLocaleString('vi-VN')}đ\` (${stats.todayOrders} đơn)\n`;
-  text += `📅 **Doanh thu tháng này:** \`${stats.monthRevenue.toLocaleString('vi-VN')}đ\` (${stats.monthOrders} đơn)\n`;
-  text += `💰 **Tổng doanh thu tích lũy:** \`${stats.totalRevenue.toLocaleString('vi-VN')}đ\` (${stats.totalOrders} đơn)\n\n`;
+  let text = `📊 <b>BÁO CÁO THỐNG KÊ DOANH THU &amp; HOẠT ĐỘNG</b>\n\n`;
+  text += `💵 <b>Doanh thu hôm nay:</b> <code>${stats.todayRevenue.toLocaleString('vi-VN')}đ</code> (${stats.todayOrders} đơn)\n`;
+  text += `📅 <b>Doanh thu tháng này:</b> <code>${stats.monthRevenue.toLocaleString('vi-VN')}đ</code> (${stats.monthOrders} đơn)\n`;
+  text += `💰 <b>Tổng doanh thu tích lũy:</b> <code>${stats.totalRevenue.toLocaleString('vi-VN')}đ</code> (${stats.totalOrders} đơn)\n\n`;
 
-  text += `👥 **Người dùng & Hội viên:**\n`;
-  text += `• Tổng người dùng đã tương tác: **${totalUsers}**\n`;
-  text += `• Tổng số thành viên VIP: **${vipCount}**\n\n`;
+  text += `👥 <b>Người dùng &amp; Hội viên:</b>\n`;
+  text += `• Tổng người dùng đã tương tác: <b>${totalUsers}</b>\n`;
+  text += `• Tổng số thành viên VIP: <b>${vipCount}</b>\n\n`;
 
-  text += `🏆 **Top 5 truyện bán chạy nhất:**\n`;
+  text += `🏆 <b>Top truyện bán chạy nhất (Chỉ tính truyện trả phí):</b>\n`;
   if (topBooks.length > 0) {
     topBooks.forEach((b, i) => {
-      text += `${i + 1}. #${b.id} *${b.name}* — Đã bán: **${b.sold_quantity || 0}** lượt\n`;
+      text += `${i + 1}. #${b.id} <b>${escapeHtml(b.name)}</b> — Đã bán: <b>${b.sold_quantity || 0}</b> lượt\n`;
     });
   } else {
-    text += `(Chưa có dữ liệu)\n`;
+    text += `<i>(Chưa có dữ liệu đơn mua trả phí)</i>\n`;
   }
 
   const keyboard = getAdminBackKeyboard();
@@ -80,11 +82,13 @@ async function handleAdminStats(bot, chatId, messageId = null) {
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: keyboard
-    }).catch(() => {});
+    }).catch(async () => {
+      await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+    });
   } else {
-    await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: keyboard });
+    await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
   }
 }
 
@@ -95,19 +99,19 @@ async function handleAdminEvent(bot, chatId, messageId = null) {
   if (!checkIsAdmin(chatId)) return;
 
   const event = await getActiveEvent();
-  let text = `🏷 **QUẢN LÝ SỰ KIỆN KHUYẾN MÃI**\n\n`;
+  let text = `🏷 <b>QUẢN LÝ SỰ KIỆN KHUYẾN MÃI</b>\n\n`;
 
   if (event && event.active) {
-    text += `🟢 **Trạng thái:** ĐANG HOẠT ĐỘNG\n`;
-    text += `• Mức giảm: **${event.percent}%**\n`;
-    text += `• Nội dung banner:\n_${event.content}_\n\n`;
+    text += `🟢 <b>Trạng thái:</b> ĐANG HOẠT ĐỘNG\n`;
+    text += `• Mức giảm: <b>${event.percent}%</b>\n`;
+    text += `• Nội dung banner:\n<i>${escapeHtml(event.content)}</i>\n\n`;
   } else {
-    text += `🔴 **Trạng thái:** ĐANG TẮT (Không có sự kiện)\n\n`;
+    text += `🔴 <b>Trạng thái:</b> ĐANG TẮT (Không có sự kiện)\n\n`;
   }
 
-  text += `📝 **Hướng dẫn lệnh thao tác nhanh:**\n`;
-  text += `• Bật/cập nhật sự kiện: Gõ \`/setevent <%> <nội dung>\`\n  _Ví dụ:_ \`/setevent 20 Chúc mừng ngày 8/3 - Giảm giá siêu sốc!\`\n`;
-  text += `• Tắt sự kiện: Gõ \`/stopevent\``;
+  text += `📝 <b>Hướng dẫn lệnh thao tác nhanh:</b>\n`;
+  text += `• Bật/cập nhật sự kiện: Gõ <code>/setevent &lt;%&gt; &lt;nội dung&gt;</code>\n  <i>Ví dụ:</i> <code>/setevent 20 Chúc mừng ngày 8/3 - Giảm giá siêu sốc!</code>\n`;
+  text += `• Tắt sự kiện: Gõ <code>/stopevent</code>`;
 
   const keyboard = getAdminBackKeyboard();
 
@@ -115,11 +119,13 @@ async function handleAdminEvent(bot, chatId, messageId = null) {
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: keyboard
-    }).catch(() => {});
+    }).catch(async () => {
+      await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+    });
   } else {
-    await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: keyboard });
+    await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
   }
 }
 
@@ -129,10 +135,10 @@ async function handleAdminEvent(bot, chatId, messageId = null) {
 async function handleAdminVipPrompt(bot, chatId, messageId = null) {
   if (!checkIsAdmin(chatId)) return;
 
-  let text = `💎 **QUẢN LÝ THÀNH VIÊN VIP**\n\n`;
+  let text = `💎 <b>QUẢN LÝ THÀNH VIÊN VIP</b>\n\n`;
   text += `Bạn có thể cấp hoặc hủy quyền VIP của bất kỳ người dùng nào bằng lệnh sau:\n\n`;
-  text += `• Cấp VIP cho user: Gõ \`/addvip <telegram_id>\`\n  _Ví dụ:_ \`/addvip 123456789\`\n\n`;
-  text += `• Thu hồi VIP của user: Gõ \`/delvip <telegram_id>\`\n  _Ví dụ:_ \`/delvip 123456789\``;
+  text += `• Cấp VIP cho user: Gõ <code>/addvip &lt;telegram_id&gt;</code>\n  <i>Ví dụ:</i> <code>/addvip 123456789</code>\n\n`;
+  text += `• Thu hồi VIP của user: Gõ <code>/delvip &lt;telegram_id&gt;</code>\n  <i>Ví dụ:</i> <code>/delvip 123456789</code>`;
 
   const keyboard = getAdminBackKeyboard();
 
@@ -140,26 +146,28 @@ async function handleAdminVipPrompt(bot, chatId, messageId = null) {
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: keyboard
-    }).catch(() => {});
+    }).catch(async () => {
+      await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+    });
   } else {
-    await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: keyboard });
+    await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
   }
 }
 
 /**
- * Hướng dẫn gửi tin nhắn broadcast
+ * Hướng dẫn gửi tin nhắn broadcast (Đã sửa lỗi parse ký tự)
  */
 async function handleAdminBroadcastPrompt(bot, chatId, messageId = null) {
   if (!checkIsAdmin(chatId)) return;
 
   const userCount = await getUserCount();
-  let text = `📢 **GỬI TIN NHẮN BROADCAST (HÀNG LOẠT)**\n\n`;
-  text += `Hiện tại có **${userCount}** người dùng trong hệ thống.\n\n`;
-  text += `Để gửi tin nhắn thông báo (truyện mới, khuyến mãi) đến toàn bộ người dùng, bạn hãy gõ lệnh:\n`;
-  text += `\`/broadcast <Nội dung tin nhắn cần gửi>\`\n\n`;
-  text += `_Ví dụ:_ \`/broadcast 🔥 Vừa cập nhật 5 bộ truyện mới cực hay, mời bạn bấm vào bot để đọc thử nhé!_`;
+  let text = `📢 <b>GỬI TIN NHẮN BROADCAST (HÀNG LOẠT)</b>\n\n`;
+  text += `Hiện tại có <b>${userCount}</b> người dùng đã từng tương tác với bot.\n\n`;
+  text += `Để gửi tin nhắn thông báo (ra mắt truyện mới, khuyến mãi) đến toàn bộ người dùng, bạn hãy gõ lệnh theo cú pháp sau:\n\n`;
+  text += `<code>/broadcast &lt;Nội dung thông báo cần gửi&gt;</code>\n\n`;
+  text += `<i>Ví dụ thực tế:</i>\n<code>/broadcast 🔥 Vừa cập nhật 5 bộ truyện mới cực hay, mời bạn vào mục Danh sách truyện để thưởng thức nhé!</code>`;
 
   const keyboard = getAdminBackKeyboard();
 
@@ -167,11 +175,13 @@ async function handleAdminBroadcastPrompt(bot, chatId, messageId = null) {
     await bot.editMessageText(text, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: keyboard
-    }).catch(() => {});
+    }).catch(async () => {
+      await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
+    });
   } else {
-    await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: keyboard });
+    await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: keyboard });
   }
 }
 
@@ -185,7 +195,7 @@ async function handleSetEventCommand(bot, msg, match) {
   const input = match[1] ? match[1].trim() : '';
   const firstSpace = input.indexOf(' ');
   if (firstSpace === -1) {
-    return bot.sendMessage(chatId, `⚠️ Cú pháp: \`/setevent <%> <nội dung>\`\nVí dụ: \`/setevent 20 Sale mừng 8/3\``, { parse_mode: 'Markdown' });
+    return bot.sendMessage(chatId, `⚠️ Cú pháp: <code>/setevent &lt;%&gt; &lt;nội dung&gt;</code>\nVí dụ: <code>/setevent 20 Sale mừng 8/3</code>`, { parse_mode: 'HTML' });
   }
 
   const percent = parseInt(input.substring(0, firstSpace), 10);
@@ -196,7 +206,7 @@ async function handleSetEventCommand(bot, msg, match) {
   }
 
   await setEventStatus(true, percent, content);
-  await bot.sendMessage(chatId, `✅ Đã kích hoạt sự kiện: Giảm **${percent}%**!\nNội dung: _${content}_`, { parse_mode: 'Markdown' });
+  await bot.sendMessage(chatId, `✅ Đã kích hoạt sự kiện: Giảm <b>${percent}%</b>!\nNội dung: <i>${escapeHtml(content)}</i>`, { parse_mode: 'HTML' });
 }
 
 /**
@@ -219,12 +229,12 @@ async function handleAddVIPCommand(bot, msg, match) {
 
   const targetId = match[1] ? match[1].trim() : '';
   if (!targetId) {
-    return bot.sendMessage(chatId, `⚠️ Cú pháp: \`/addvip <telegram_id>\``);
+    return bot.sendMessage(chatId, `⚠️ Cú pháp: <code>/addvip &lt;telegram_id&gt;</code>`, { parse_mode: 'HTML' });
   }
 
   await addToVIP(targetId);
-  await bot.sendMessage(chatId, `✅ Đã cấp VIP thành công cho Telegram ID: \`${targetId}\``, { parse_mode: 'Markdown' });
-  await bot.sendMessage(targetId, `🎉 **CHÚC MỪNG!** Bạn đã được Admin cấp quyền **VIP Member** (Giảm 50% mọi đơn hàng)!`, { parse_mode: 'Markdown' }).catch(() => {});
+  await bot.sendMessage(chatId, `✅ Đã cấp VIP thành công cho Telegram ID: <code>${targetId}</code>`, { parse_mode: 'HTML' });
+  await bot.sendMessage(targetId, `🎉 <b>CHÚC MỪNG!</b> Bạn đã được Admin cấp quyền <b>VIP Member</b> (Giảm 50% mọi đơn hàng)!`, { parse_mode: 'HTML' }).catch(() => {});
 }
 
 /**
@@ -236,11 +246,11 @@ async function handleDelVIPCommand(bot, msg, match) {
 
   const targetId = match[1] ? match[1].trim() : '';
   if (!targetId) {
-    return bot.sendMessage(chatId, `⚠️ Cú pháp: \`/delvip <telegram_id>\``);
+    return bot.sendMessage(chatId, `⚠️ Cú pháp: <code>/delvip &lt;telegram_id&gt;</code>`, { parse_mode: 'HTML' });
   }
 
   await removeFromVIP(targetId);
-  await bot.sendMessage(chatId, `✅ Đã thu hồi VIP của Telegram ID: \`${targetId}\``, { parse_mode: 'Markdown' });
+  await bot.sendMessage(chatId, `✅ Đã thu hồi VIP của Telegram ID: <code>${targetId}</code>`, { parse_mode: 'HTML' });
 }
 
 /**
@@ -252,24 +262,33 @@ async function handleBroadcastCommand(bot, msg, match) {
 
   const content = match[1] ? match[1].trim() : '';
   if (!content) {
-    return bot.sendMessage(chatId, `⚠️ Cú pháp: \`/broadcast <nội dung>\``);
+    return bot.sendMessage(chatId, `⚠️ Cú pháp: <code>/broadcast &lt;nội dung&gt;</code>`, { parse_mode: 'HTML' });
   }
 
   const userIds = await getAllUserIds();
-  await bot.sendMessage(chatId, `⏳ Đang bắt đầu gửi tin nhắn tới **${userIds.length}** người dùng...`, { parse_mode: 'Markdown' });
+  await bot.sendMessage(chatId, `⏳ Đang bắt đầu gửi tin nhắn tới <b>${userIds.length}</b> người dùng...`, { parse_mode: 'HTML' });
 
   let sentCount = 0;
   for (const uid of userIds) {
     try {
-      await bot.sendMessage(uid, content, { parse_mode: 'Markdown' });
+      await bot.sendMessage(uid, content);
       sentCount++;
     } catch (e) {
       // Bỏ qua nếu user đã block bot
     }
-    await new Promise(r => setTimeout(r, 100)); // độ trễ 100ms tránh flood
+    await new Promise(r => setTimeout(r, 60)); // độ trễ 60ms tránh flood limit
   }
 
-  await bot.sendMessage(chatId, `✅ Đã gửi thành công tới **${sentCount}/${userIds.length}** người dùng!`, { parse_mode: 'Markdown' });
+  await bot.sendMessage(chatId, `✅ Đã gửi thành công tới <b>${sentCount}/${userIds.length}</b> người dùng!`, { parse_mode: 'HTML' });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 module.exports = {

@@ -1,16 +1,37 @@
 const pool = require('./connection');
+const { isCachedVIP, addCachedVIP, removeCachedVIP, setAllCachedVIPs } = require('./cache');
 
 /**
- * Kiểm tra xem user có quyền VIP hay không
+ * Tải trước danh sách VIP vào RAM khi khởi động bot
+ */
+async function preloadVIPCache() {
+  try {
+    const res = await pool.query('SELECT telegram_id FROM vip');
+    const ids = res.rows.map(r => r.telegram_id);
+    setAllCachedVIPs(ids);
+  } catch (err) {
+    console.error('❌ Lỗi preloadVIPCache:', err.message);
+  }
+}
+
+/**
+ * Kiểm tra xem user có quyền VIP hay không (Ưu tiên Cache RAM 0ms)
  */
 async function isUserVIP(chatId) {
   if (!chatId) return false;
+  const cached = isCachedVIP(chatId);
+  if (cached !== null) {
+    return cached;
+  }
+
   try {
     const res = await pool.query(
       'SELECT 1 FROM vip WHERE telegram_id = $1 LIMIT 1', 
       [chatId.toString()]
     );
-    return res.rowCount > 0;
+    const isVIP = res.rowCount > 0;
+    if (isVIP) addCachedVIP(chatId);
+    return isVIP;
   } catch (err) {
     console.error('❌ Lỗi check VIP:', err.message);
     return false;
@@ -18,7 +39,7 @@ async function isUserVIP(chatId) {
 }
 
 /**
- * Thêm user vào bảng VIP
+ * Thêm user vào bảng VIP (Đồng bộ cả DB và Cache RAM)
  */
 async function addToVIP(chatId) {
   if (!chatId) return false;
@@ -27,6 +48,7 @@ async function addToVIP(chatId) {
       'INSERT INTO vip (telegram_id) VALUES ($1) ON CONFLICT (telegram_id) DO NOTHING',
       [chatId.toString()]
     );
+    addCachedVIP(chatId);
     console.log(`✅ Đã cấp VIP cho Telegram ID: ${chatId}`);
     return true;
   } catch (err) {
@@ -42,6 +64,7 @@ async function removeFromVIP(chatId) {
   if (!chatId) return false;
   try {
     await pool.query('DELETE FROM vip WHERE telegram_id = $1', [chatId.toString()]);
+    removeCachedVIP(chatId);
     console.log(`🗑️ Đã thu hồi VIP của Telegram ID: ${chatId}`);
     return true;
   } catch (err) {
@@ -64,6 +87,7 @@ async function getVIPCount() {
 }
 
 module.exports = {
+  preloadVIPCache,
   isUserVIP,
   addToVIP,
   removeFromVIP,

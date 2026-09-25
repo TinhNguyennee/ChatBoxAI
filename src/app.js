@@ -7,8 +7,13 @@ const { runMigrations } = require('./database/migrate');
 const { processSepayWebhook } = require('./services/sepayService');
 const { startExpirationWorker } = require('./services/orderExpirationService');
 
+const { preloadVIPCache } = require('./database/vipRepo');
+const { getBooks } = require('./database/booksRepo');
+const { getActiveEvent } = require('./database/eventsRepo');
+const { hasUserPurchased } = require('./database/purchasesRepo');
+
 const { handleStart } = require('./handlers/startHandler');
-const { handleBookList } = require('./handlers/listHandler');
+const { handleBookList, handleBookDetail, handleReadOwnedBook } = require('./handlers/listHandler');
 const { handleViewCart } = require('./handlers/cartHandler');
 const { handleMyBooks } = require('./handlers/myBooksHandler');
 const { handleCallbackQuery } = require('./handlers/callbackHandler');
@@ -72,8 +77,8 @@ bot.onText(/\/mytruyen/, (msg) => handleMyBooks(bot, msg.chat.id, 1));
 bot.onText(/\/id/, async (msg) => {
   const chatId = msg.chat.id;
   const username = msg.from.username ? `@${msg.from.username}` : "Không có username";
-  const text = `🆔 **Telegram ID của bạn là:**\n\n\`${chatId}\`\n\n📌 Username: ${username}`;
-  await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+  const text = `🆔 <b>Telegram ID của bạn là:</b>\n\n<code>${chatId}</code>\n\n📌 Username: ${username}`;
+  await bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
 });
 
 // 6. Lệnh Quản trị viên (Admin)
@@ -84,7 +89,26 @@ bot.onText(/\/addvip (.+)/, (msg, match) => handleAddVIPCommand(bot, msg, match)
 bot.onText(/\/delvip (.+)/, (msg, match) => handleDelVIPCommand(bot, msg, match));
 bot.onText(/\/broadcast (.+)/, (msg, match) => handleBroadcastCommand(bot, msg, match));
 
-// 7. Xử lý tất cả các sự kiện bấm nút (Callback Query)
+// 7. Xử lý tin nhắn gõ số ID truyện trực tiếp (Ví dụ gõ: "47" hoặc "#47")
+bot.on('message', async (msg) => {
+  if (!msg.text || msg.text.startsWith('/')) return;
+  const trimmed = msg.text.trim();
+  const match = trimmed.match(/^#?(\d+)$/);
+  if (match) {
+    const bookId = parseInt(match[1], 10);
+    const chatId = msg.chat.id;
+    const isOwned = await hasUserPurchased(chatId, bookId);
+    if (isOwned) {
+      // Đã mua -> Gửi link đọc ngay lập tức!
+      return handleReadOwnedBook(bot, chatId, bookId);
+    } else {
+      // Chưa mua -> Mở trang chi tiết truyện kèm nút Thêm giỏ hàng!
+      return handleBookDetail(bot, chatId, bookId, 1);
+    }
+  }
+});
+
+// 8. Xử lý tất cả các sự kiện bấm nút (Callback Query)
 bot.on('callback_query', (callbackQuery) => handleCallbackQuery(bot, callbackQuery));
 
 // Global Error Handlers
@@ -110,7 +134,15 @@ async function startApp() {
     // 2. Khởi chạy worker dọn dẹp và nhắc nhở đơn hàng quá hạn 15 phút
     startExpirationWorker(bot);
 
-    // 3. Khởi động Webhook hoặc Polling
+    // 3. Tải trước Cache RAM (Kho sách, VIP, Sự kiện) để bot phản hồi tức thì 0ms
+    await Promise.all([
+      preloadVIPCache(),
+      getBooks(),
+      getActiveEvent()
+    ]);
+    console.log('⚡ Đã nạp trước Cache RAM thành công (Kho sách, VIP, Sự kiện)!');
+
+    // 4. Khởi động Webhook hoặc Polling
     if (isPolling && BOT_TOKEN) {
       try {
         await bot.deleteWebHook();
@@ -126,7 +158,7 @@ async function startApp() {
       console.log(`✅ Webhook Telegram đã được kích hoạt tại: ${webhookUrl}`);
     }
 
-    // 4. Khởi động Web Server Express
+    // 5. Khởi động Web Server Express
     app.listen(PORT, () => {
       console.log(`🚀 Web Server đang lắng nghe trên cổng: ${PORT}`);
     });

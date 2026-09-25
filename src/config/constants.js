@@ -1,6 +1,6 @@
 module.exports = {
-  // Phân trang danh sách truyện
-  ITEMS_PER_PAGE: 5,
+  // Phân trang danh sách truyện (Tăng lên 7 truyện/trang)
+  ITEMS_PER_PAGE: 7,
   
   // Số lượng truyện gửi kèm trong 1 tin nhắn link đọc
   ITEMS_PER_SEND_CHUNK: 3,
