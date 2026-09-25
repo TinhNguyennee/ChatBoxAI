@@ -100,13 +100,17 @@ async function handleBookDetail(bot, chatId, bookId, fromPage = 1, messageId = n
       priceDisplay += ` (💎 VIP: ${vipPrice.toLocaleString('vi-VN')}đ)`;
     }
 
+    const chaptersText = book.chapters ? `${book.chapters} chương` : 'Đang cập nhật';
+    const lengthText = book.chapterLength ? `${book.chapterLength}` : 'Đang cập nhật';
+    const genresText = (Array.isArray(book.genres) && book.genres.length > 0) ? book.genres.join(', ') : 'Đang cập nhật';
+
     let text = `📖 <b>THÔNG TIN TRUYỆN: #${book.id}</b>\n`;
     text += `━━━━━━━━━━━━━━━━━━━━\n`;
     text += `📌 <b>Tên truyện:</b> ${escapeHtml(book.name)}\n`;
     text += `💰 <b>Giá bán:</b> <code>${priceDisplay}</code>\n`;
-    text += `📚 <b>Số chương:</b> ${escapeHtml(book.chapters || 'Đang cập nhật')}\n`;
-    text += `📏 <b>Độ dài:</b> ${escapeHtml(book.chapterLength || 'Đang cập nhật')}\n`;
-    text += `🎭 <b>Thể loại:</b> ${escapeHtml(book.genres.length > 0 ? book.genres.join(', ') : 'Đang cập nhật')}\n`;
+    text += `📚 <b>Số chương:</b> ${escapeHtml(chaptersText)}\n`;
+    text += `📏 <b>Độ dài:</b> ${escapeHtml(lengthText)}\n`;
+    text += `🎭 <b>Thể loại:</b> ${escapeHtml(genresText)}\n`;
     text += `━━━━━━━━━━━━━━━━━━━━\n`;
     text += `📝 <b>Tóm tắt nội dung:</b>\n<i>${escapeHtml(book.description || 'Chưa có mô tả')}</i>\n\n`;
 
@@ -189,8 +193,8 @@ async function handleReadOwnedBook(bot, chatId, bookId) {
 }
 
 function escapeHtml(str) {
-  if (!str) return '';
-  return str
+  if (str === null || str === undefined) return '';
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
