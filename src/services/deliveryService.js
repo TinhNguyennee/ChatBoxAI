@@ -51,22 +51,11 @@ async function sendBookLinks(bot, chatId, books, isFree = false) {
       text += `💡 <b>Mẹo:</b> Dùng app Google Docs để đọc mượt nhất. Bạn có thể mở lại bất cứ lúc nào trong mục <b>Tủ truyện của tôi</b>.\nChúc bạn đọc truyện thật vui vẻ! 🔥`;
     }
 
-    // Tạo các nút bấm tương tác nhanh bên dưới tin nhắn
+    // Tạo các nút điều hướng tiện lợi ở cuối danh sách truyện
     const inlineButtons = [];
-    chunk.forEach(b => {
-      const validLinks = extractLinks(b.link);
-      validLinks.forEach(item => {
-        const shortTitle = b.name.length > 16 ? b.name.substring(0, 14) + '..' : b.name;
-        const btnText = validLinks.length > 1
-          ? `📖 #${b.id} (${item.label})`
-          : `📖 Đọc #${b.id}. ${shortTitle}`;
-        inlineButtons.push([{ text: btnText, url: item.url }]);
-      });
-    });
-
     if (partNumber === totalParts) {
       inlineButtons.push([
-        { text: "📖 Mở Tủ Truyện Của Tôi", callback_data: "my_books:1" },
+        { text: "📚 Mở Tủ Truyện Của Tôi", callback_data: "my_books:1" },
         { text: "🏠 Menu Chính", callback_data: "nav_main" }
       ]);
     }

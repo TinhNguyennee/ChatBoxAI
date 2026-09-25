@@ -93,6 +93,24 @@ function isOrderExpiredInCache(orderId) {
   return cache.expiredOrders.has(orderId);
 }
 
+const orderMessageMap = new Map();
+
+function setOrderMessageId(orderId, messageId) {
+  if (orderId && messageId) {
+    orderMessageMap.set(String(orderId), messageId);
+    // Giới hạn 500 đơn gần nhất để không tốn RAM
+    if (orderMessageMap.size > 500) {
+      const firstKey = orderMessageMap.keys().next().value;
+      orderMessageMap.delete(firstKey);
+    }
+  }
+}
+
+function getOrderMessageId(orderId) {
+  if (!orderId) return null;
+  return orderMessageMap.get(String(orderId)) || null;
+}
+
 module.exports = {
   getCachedBooks,
   setCachedBooks,
@@ -105,5 +123,7 @@ module.exports = {
   setCachedEvent,
   clearEventCache,
   markOrderAsExpiredInCache,
-  isOrderExpiredInCache
+  isOrderExpiredInCache,
+  setOrderMessageId,
+  getOrderMessageId
 };

@@ -67,6 +67,7 @@ async function runMigrations() {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS amount BIGINT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_lines JSONB DEFAULT '[]'::jsonb;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS sepay_trans_id VARCHAR(128);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS message_id BIGINT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP WITH TIME ZONE;
     `);

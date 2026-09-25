@@ -76,23 +76,52 @@ async function getOrderById(orderId) {
 
 /**
  * Tìm đơn PENDING khớp với nội dung chuyển khoản từ SePay
+ * Tối ưu tuyệt đối: Tự động khớp cả mã 'OD...' lẫn '0D...' (khách gõ nhầm số 0 thành chữ O) trong duy nhất 1 query
  */
 async function findPendingOrderByContent(content) {
   if (!content) return null;
   try {
     const upperContent = content.toUpperCase();
+    // Chuẩn hóa nội dung nếu người dùng gõ nhầm số 0 thành chữ O hoặc có dấu cách
+    const normalizedContent = upperContent
+      .replace(/0D\s*(\d{5,})/g, 'OD$1')
+      .replace(/O\s*D\s*(\d{5,})/g, 'OD$1');
+
     const res = await pool.query(
       `SELECT * FROM orders 
        WHERE status = $1 
          AND expires_at > NOW() 
-         AND ($2 LIKE ('%' || order_id || '%') OR $2 LIKE ('%' || order_code || '%'))
+         AND (
+           $2 LIKE ('%' || order_id || '%') 
+           OR $2 LIKE ('%' || order_code || '%')
+           OR $3 LIKE ('%' || order_id || '%')
+           OR $3 LIKE ('%' || order_code || '%')
+           OR $3 LIKE ('%' || REPLACE(order_id, 'OD', '0D') || '%')
+         )
        LIMIT 1`,
-      [ORDER_STATUS.PENDING, upperContent]
+      [ORDER_STATUS.PENDING, normalizedContent, upperContent]
     );
     return res.rows[0] || null;
   } catch (err) {
     console.error('❌ Lỗi findPendingOrderByContent:', err.message);
     return null;
+  }
+}
+
+/**
+ * Cập nhật message_id của tin nhắn QR để sửa giao diện tức thì khi thanh toán thành công
+ */
+async function updateOrderMessageId(orderId, messageId) {
+  if (!orderId || !messageId) return false;
+  try {
+    await pool.query(
+      'UPDATE orders SET message_id = $1 WHERE order_id = $2 OR order_code = $2',
+      [messageId, orderId]
+    );
+    return true;
+  } catch (err) {
+    console.error(`❌ Lỗi updateOrderMessageId (${orderId}):`, err.message);
+    return false;
   }
 }
 
@@ -205,5 +234,6 @@ module.exports = {
   markOrderAsPaid,
   getExpiredPendingOrders,
   deleteOrder,
-  getRevenueStats
+  getRevenueStats,
+  updateOrderMessageId
 };

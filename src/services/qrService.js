@@ -43,9 +43,9 @@ async function sendQRCode(bot, chatId, amount, content, caption, replyMarkup = n
     if (replyMarkup) {
       options.reply_markup = replyMarkup;
     }
-    await bot.sendPhoto(chatId, qrBuffer, options);
+    const sentMsg = await bot.sendPhoto(chatId, qrBuffer, options);
     console.log(`✔ Đã gửi ảnh QR Code đơn [${content}] tới ChatID: ${chatId}`);
-    return true;
+    return sentMsg;
   } catch (err) {
     console.error(`❌ Gửi QR thất bại tới ${chatId}:`, err.message);
     try {

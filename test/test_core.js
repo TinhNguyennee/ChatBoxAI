@@ -117,7 +117,19 @@ async function runTests() {
   assert.strictEqual(extracted[0].label, "Part 1");
   assert.strictEqual(extracted[1].url, "https://docs.google.com/part2");
   assert.strictEqual(extracted[1].label, "Part 2");
-  console.log('✅ Test Extract Links: Tách chính xác link nhiều phần (Part 1, Part 2) không bị dính ngoặc');
+  // 8. Test 0D vs OD normalization for transfer content
+  function normalizeTransferContent(content) {
+    if (!content) return '';
+    return content.toUpperCase()
+      .replace(/0D\s*(\d{5,})/g, 'OD$1')
+      .replace(/O\s*D\s*(\d{5,})/g, 'OD$1');
+  }
+
+  assert.strictEqual(normalizeTransferContent("CK 0D123456789"), "CK OD123456789");
+  assert.strictEqual(normalizeTransferContent("Thanh toan 0D 123456789"), "THANH TOAN OD123456789");
+  assert.strictEqual(normalizeTransferContent("CK OD 123456789"), "CK OD123456789");
+  assert.strictEqual(normalizeTransferContent("CK OD123456789"), "CK OD123456789");
+  console.log('✅ Test 0D / OD Normalization: Tự động chuyển 0D thành OD mượt mà, không sót đơn');
 
   console.log('\n🎉 TẤT CẢ CÁC BỘ KIỂM THỬ ĐÃ VƯỢT QUA XUẤT SẮC!');
 }

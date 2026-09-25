@@ -7,6 +7,7 @@ const { addPurchases } = require('../database/purchasesRepo');
 const { removeFromCart } = require('../database/cartRepo');
 const { cancelExpirationTimer } = require('./orderExpirationService');
 const { sendBookLinks } = require('./deliveryService');
+const { getOrderMessageId } = require('../database/cache');
 
 /**
  * Xử lý webhook từ SePay khi có biến động số dư chuyển khoản
@@ -21,7 +22,8 @@ async function processSepayWebhook(bot, reqBody, authHeader) {
     }
   }
 
-  const content = (reqBody.content || reqBody.description || '').trim();
+  // Gộp cả content và description để không sót mã đơn
+  const content = `${reqBody.content || ''} ${reqBody.description || ''}`.trim();
   const amount = parseInt(reqBody.transferAmount || reqBody.amount, 10) || 0;
 
   if (!content) {
@@ -53,6 +55,22 @@ async function processSepayWebhook(bot, reqBody, authHeader) {
 
   // 5. Hủy đếm ngược 15 phút
   cancelExpirationTimer(orderId);
+
+  // 6. CẬP NHẬT NGAY LẬP TỨC NÚT BẤM TRÊN TIN NHẮN QR CODE THÀNH "ĐÃ THANH TOÁN THÀNH CÔNG"
+  const qrMessageId = order.message_id || getOrderMessageId(orderId);
+  if (qrMessageId && chatId) {
+    bot.editMessageReplyMarkup({
+      inline_keyboard: [
+        [{ text: "✅ ĐÃ THANH TOÁN THÀNH CÔNG", callback_data: "noop" }],
+        [{ text: "📚 Mở Tủ Truyện Của Tôi", callback_data: "my_books:1" }]
+      ]
+    }, {
+      chat_id: chatId,
+      message_id: qrMessageId
+    }).catch(err => {
+      console.warn(`Không thể cập nhật nút QR cho đơn ${orderId}:`, err.message);
+    });
+  }
 
   console.log(`✅ THANH TOÁN THÀNH CÔNG | Đơn: ${orderId} | ChatID: ${chatId} | Số tiền: ${amount.toLocaleString('vi-VN')}đ`);
 

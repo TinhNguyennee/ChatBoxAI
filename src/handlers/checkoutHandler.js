@@ -1,12 +1,12 @@
 const { getCart, clearCart } = require('../database/cartRepo');
 const { isUserVIP } = require('../database/vipRepo');
-const { createOrder, getOrderById, deleteOrder } = require('../database/ordersRepo');
+const { createOrder, getOrderById, deleteOrder, updateOrderMessageId } = require('../database/ordersRepo');
 const { addPurchases } = require('../database/purchasesRepo');
 const { incrementSoldQuantity } = require('../database/booksRepo');
 const { calculateCartPrice, calculateVIPPrice, generateOrderId } = require('../services/pricingService');
 const { sendQRCode } = require('../services/qrService');
 const { scheduleOrderExpiration, cancelExpirationTimer } = require('../services/orderExpirationService');
-const { isOrderExpiredInCache, markOrderAsExpiredInCache } = require('../database/cache');
+const { isOrderExpiredInCache, markOrderAsExpiredInCache, setOrderMessageId } = require('../database/cache');
 const { sendBookLinks } = require('../services/deliveryService');
 const { getOrderPendingKeyboard } = require('../keyboards/cartKeyboards');
 const { BANK_ACCOUNT_NO, BANK_NAME, SUPPORT_USERNAME } = require('../config/env');
@@ -104,7 +104,11 @@ async function handleCheckoutCart(bot, callbackQuery) {
     const keyboard = getOrderPendingKeyboard(orderId);
 
     await bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
-    await sendQRCode(bot, chatId, finalAmount, orderId, caption, keyboard, 'HTML');
+    const qrMsg = await sendQRCode(bot, chatId, finalAmount, orderId, caption, keyboard, 'HTML');
+    if (qrMsg && qrMsg.message_id) {
+      setOrderMessageId(orderId, qrMsg.message_id);
+      updateOrderMessageId(orderId, qrMsg.message_id).catch(() => {});
+    }
 
     console.log(`📋 ĐÃ TẠO ĐƠN TRUYỆN [${orderId}] | User: ${username} | ChatID: ${chatId} | Tiền: ${finalAmount}đ`);
   } catch (err) {
@@ -173,7 +177,11 @@ async function handleBuyVIP(bot, callbackQuery) {
     const keyboard = getOrderPendingKeyboard(orderId);
 
     await bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
-    await sendQRCode(bot, chatId, finalPrice, orderId, caption, keyboard, 'HTML');
+    const qrMsg = await sendQRCode(bot, chatId, finalPrice, orderId, caption, keyboard, 'HTML');
+    if (qrMsg && qrMsg.message_id) {
+      setOrderMessageId(orderId, qrMsg.message_id);
+      updateOrderMessageId(orderId, qrMsg.message_id).catch(() => {});
+    }
 
     console.log(`📋 ĐÃ TẠO ĐƠN VIP [${orderId}] | User: ${username} | ChatID: ${chatId} | Tiền: ${finalPrice}đ`);
   } catch (err) {
@@ -186,6 +194,7 @@ async function handleBuyVIP(bot, callbackQuery) {
  * Kiểm tra trạng thái đơn hàng khi người dùng bấm nút tra cứu (Tối ưu siêu tốc 0ms với Cache)
  */
 async function handleCheckOrder(bot, callbackQuery, orderId) {
+  const chatId = callbackQuery.message.chat.id;
   try {
     // 1. Kiểm tra nhanh trong Cache đơn hết hạn (0ms)
     if (isOrderExpiredInCache(orderId)) {
