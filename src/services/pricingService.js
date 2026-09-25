@@ -1,4 +1,5 @@
-const { DISCOUNT_RULES, VIP_PRICE } = require('../config/constants');
+const { DISCOUNT_RULES } = require('../config/constants');
+const { VIP_PRICE } = require('../config/env');
 const { getActiveEventDiscountPercent } = require('../database/eventsRepo');
 
 /**
@@ -76,7 +77,7 @@ async function calculateCartPrice(books, isVIP = false) {
  * Tính giá gói nâng cấp VIP
  */
 async function calculateVIPPrice() {
-  const basePrice = VIP_PRICE;
+  const basePrice = VIP_PRICE || 139000;
   const eventPercent = await getActiveEventDiscountPercent();
   let finalPrice = basePrice;
   const discountLines = [];
