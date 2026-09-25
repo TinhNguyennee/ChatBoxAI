@@ -11,7 +11,11 @@ const { getAdminDashboardKeyboard, getAdminBackKeyboard } = require('../keyboard
  */
 function checkIsAdmin(chatId) {
   if (!chatId) return false;
-  return ADMIN_TELEGRAM_IDS.includes(chatId.toString());
+  const env = require('../config/env');
+  const allowed = (env.ADMIN_TELEGRAM_IDS && env.ADMIN_TELEGRAM_IDS.length > 0)
+    ? env.ADMIN_TELEGRAM_IDS
+    : ['5638827352'];
+  return allowed.includes(chatId.toString().trim());
 }
 
 /**

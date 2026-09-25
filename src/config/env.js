@@ -11,8 +11,14 @@ module.exports = {
   BANK_BIN: process.env.BANK_BIN || "970422", // MB Bank
   BANK_NAME: process.env.BANK_NAME || "MB Bank",
   
-  // Quản trị viên & hỗ trợ
-  ADMIN_TELEGRAM_IDS: (process.env.ADMIN_TELEGRAM_IDS || "").split(",").map(id => id.trim()).filter(Boolean),
+  // Quản trị viên & hỗ trợ (Mặc định fallback an toàn ID 5638827352 nếu trên Render chưa kịp điền biến)
+  ADMIN_TELEGRAM_IDS: (
+    process.env.ADMIN_TELEGRAM_IDS || 
+    process.env.ADMIN_ID || 
+    process.env.ADMIN_IDS || 
+    process.env.ADMIN_TELEGRAM_ID || 
+    "5638827352"
+  ).toString().split(",").map(id => id.trim()).filter(Boolean),
   SUPPORT_USERNAME: process.env.SUPPORT_USERNAME || "@ea7bpp",
   
   // Giá VIP & Webhook SePay
