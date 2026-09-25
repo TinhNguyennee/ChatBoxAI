@@ -2,7 +2,8 @@ const { ADMIN_TELEGRAM_IDS } = require('../config/env');
 const { getRevenueStats } = require('../database/ordersRepo');
 const { getUserCount, getAllUserIds } = require('../database/usersRepo');
 const { getVIPCount, addToVIP, removeFromVIP } = require('../database/vipRepo');
-const { getTopSellingBooks } = require('../database/booksRepo');
+const { getTopSellingBooks, getBooks } = require('../database/booksRepo');
+const { clearBooksCache } = require('../database/cache');
 const { getActiveEvent, setEventStatus } = require('../database/eventsRepo');
 const { getAdminDashboardKeyboard, getAdminBackKeyboard } = require('../keyboards/adminKeyboards');
 
@@ -286,6 +287,30 @@ async function handleBroadcastCommand(bot, msg, match) {
   await bot.sendMessage(chatId, `✅ Đã gửi thành công tới <b>${sentCount}/${userIds.length}</b> người dùng!`, { parse_mode: 'HTML' });
 }
 
+/**
+ * Làm mới kho truyện (xóa cache RAM để nạp lại ngay lập tức từ Neon DB)
+ */
+async function handleReloadBooks(bot, chatId, callbackQueryId = null) {
+  if (!checkIsAdmin(chatId)) return;
+
+  clearBooksCache();
+  const books = await getBooks();
+
+  const text = 
+    `🔄 <b>ĐÃ LÀM MỚI KHO TRUYỆN THÀNH CÔNG!</b>\n\n` +
+    `⚡ Đã xóa sạch bộ nhớ tạm (Cache RAM) và nạp dữ liệu mới nhất từ Neon Database.\n` +
+    `📚 Tổng số truyện hiện tại: <b>${books.length} cuốn truyện</b>.`;
+
+  if (callbackQueryId) {
+    await bot.answerCallbackQuery(callbackQueryId, { 
+      text: `✅ Đã làm mới ${books.length} truyện từ Neon DB!`, 
+      show_alert: true 
+    }).catch(() => {});
+  }
+
+  await bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+}
+
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -306,5 +331,6 @@ module.exports = {
   handleStopEventCommand,
   handleAddVIPCommand,
   handleDelVIPCommand,
-  handleBroadcastCommand
+  handleBroadcastCommand,
+  handleReloadBooks
 };

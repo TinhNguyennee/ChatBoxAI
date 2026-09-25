@@ -5,7 +5,7 @@
 const cache = {
   books: null,
   booksLastFetched: 0,
-  booksTTL: 10 * 60 * 1000, // 10 phút tự làm mới
+  booksTTL: 3 * 60 * 1000, // 3 phút tự động làm mới từ Neon DB
 
   vipSet: new Set(),
   vipLoaded: false,

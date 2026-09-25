@@ -23,7 +23,8 @@ const {
   handleStopEventCommand,
   handleAddVIPCommand,
   handleDelVIPCommand,
-  handleBroadcastCommand
+  handleBroadcastCommand,
+  handleReloadBooks
 } = require('./handlers/adminHandler');
 
 // ======================
@@ -89,6 +90,7 @@ bot.onText(/\/ping/, async (msg) => {
 
 // 6. Lệnh Quản trị viên (Admin)
 bot.onText(/\/admin/, (msg) => handleAdminDashboard(bot, msg.chat.id));
+bot.onText(/\/reload/, (msg) => handleReloadBooks(bot, msg.chat.id));
 bot.onText(/\/setevent (.+)/, (msg, match) => handleSetEventCommand(bot, msg, match));
 bot.onText(/\/stopevent/, (msg) => handleStopEventCommand(bot, msg));
 bot.onText(/\/addvip (.+)/, (msg, match) => handleAddVIPCommand(bot, msg, match));

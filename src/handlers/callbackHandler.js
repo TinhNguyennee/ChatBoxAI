@@ -8,7 +8,8 @@ const {
   handleAdminStats, 
   handleAdminEvent, 
   handleAdminVipPrompt, 
-  handleAdminBroadcastPrompt 
+  handleAdminBroadcastPrompt,
+  handleReloadBooks 
 } = require('./adminHandler');
 
 /**
@@ -158,6 +159,10 @@ async function handleCallbackQuery(bot, callbackQuery) {
     if (data === 'admin_broadcast_prompt') {
       await bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
       return handleAdminBroadcastPrompt(bot, chatId, messageId);
+    }
+
+    if (data === 'admin_reload_books') {
+      return handleReloadBooks(bot, chatId, callbackQuery.id);
     }
 
     // Mặc định phản hồi để không bị treo nút

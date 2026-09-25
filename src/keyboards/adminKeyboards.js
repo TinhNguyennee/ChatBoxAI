@@ -13,6 +13,9 @@ function getAdminDashboardKeyboard() {
         { text: "📢 Broadcast Tin Nhắn", callback_data: "admin_broadcast_prompt" }
       ],
       [
+        { text: "🔄 Làm Mới Kho Truyện (Xóa Cache)", callback_data: "admin_reload_books" }
+      ],
+      [
         { text: "🏠 Quay Lại Bot", callback_data: "nav_main" }
       ]
     ]
