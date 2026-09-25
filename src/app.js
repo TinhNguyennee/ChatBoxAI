@@ -38,8 +38,9 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: false });
 const app = express();
 app.use(bodyParser.json());
 
-// Endpoint kiểm tra hoạt động của server (Health check)
+// Endpoint kiểm tra hoạt động của server (Health check cho UptimeRobot giữ Render thức 24/7)
 app.get('/ping', (req, res) => res.send('alive'));
+app.get('/', (req, res) => res.send('alive'));
 
 // Endpoint nhận Webhook từ SePay khi có biến động số dư ngân hàng
 app.post('/sepay', async (req, res) => {
@@ -79,6 +80,11 @@ bot.onText(/\/id/, async (msg) => {
   const username = msg.from.username ? `@${msg.from.username}` : "Không có username";
   const text = `🆔 <b>Telegram ID của bạn là:</b>\n\n<code>${chatId}</code>\n\n📌 Username: ${username}`;
   await bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+});
+
+// 6. Lệnh kiểm tra bot còn thức không (/ping)
+bot.onText(/\/ping/, async (msg) => {
+  await bot.sendMessage(msg.chat.id, '🏓 <b>Pong!</b> Bot vẫn đang thức và hoạt động 24/7 bình thường! 🔥', { parse_mode: 'HTML' });
 });
 
 // 6. Lệnh Quản trị viên (Admin)
