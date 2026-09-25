@@ -33,10 +33,11 @@ async function createOrder({
         created_at, 
         expires_at
       )
-      VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, NOW(), NOW() + INTERVAL '15 minutes')
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW() + INTERVAL '15 minutes')
       RETURNING *
     `;
     const res = await pool.query(query, [
+      orderId,
       orderId,
       telegramId.toString(),
       username || null,
@@ -44,6 +45,7 @@ async function createOrder({
       JSON.stringify(items),
       bookIdsStr,
       originalAmount,
+      finalAmount,
       finalAmount,
       JSON.stringify(discountLines),
       ORDER_STATUS.PENDING
