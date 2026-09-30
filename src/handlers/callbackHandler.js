@@ -65,7 +65,7 @@ async function handleCallbackQuery(bot, callbackQuery) {
     }
 
     // 6. Giỏ hàng
-    if (data === 'view_cart') {
+    if (data === 'view_cart' || data === 'nav_cart') {
       await bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
       return handleViewCart(bot, chatId, messageId);
     }

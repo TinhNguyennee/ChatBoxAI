@@ -2,8 +2,9 @@ const { isUserVIP } = require('../database/vipRepo');
 const { getCartCount } = require('../database/cartRepo');
 const { getActiveEvent } = require('../database/eventsRepo');
 const { upsertUser } = require('../database/usersRepo');
-const { ADMIN_TELEGRAM_IDS, SUPPORT_USERNAME, GUIDE_LINK } = require('../config/env');
+const { SUPPORT_USERNAME, GUIDE_LINK } = require('../config/env');
 const { getMainMenuKeyboard } = require('../keyboards/mainKeyboards');
+const { checkIsAdmin } = require('./adminHandler');
 
 /**
  * Xử lý lệnh /start hoặc quay lại màn hình Menu chính (Siêu tốc với RAM Cache + Song song)
@@ -21,7 +22,7 @@ async function handleStart(bot, msg, isEdit = false) {
     getActiveEvent()
   ]);
 
-  const isAdmin = ADMIN_TELEGRAM_IDS.includes(chatId.toString());
+  const isAdmin = checkIsAdmin(chatId);
 
   let text = `🐸 <b>CHÀO MỪNG BẠN ĐẾN VỚI TRUYỆN ẾCH XANH</b>\n\n`;
   text += `👤 <b>Tài khoản:</b> ${escapeHtml(username)} (<code>${chatId}</code>)\n`;

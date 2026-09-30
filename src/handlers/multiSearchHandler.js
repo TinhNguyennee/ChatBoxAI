@@ -111,7 +111,7 @@ async function handleMultiBookSearch(bot, chatId, bookIds) {
     }
 
     inline_keyboard.push([
-      { text: "🛍 Xem Giỏ Hàng", callback_data: "nav_cart" },
+      { text: "🛍 Xem Giỏ Hàng", callback_data: "view_cart" },
       { text: "🏠 Menu Chính", callback_data: "nav_main" }
     ]);
 
@@ -158,7 +158,7 @@ async function handleBatchAddToCart(bot, callbackQuery) {
   // Cập nhật lại tin nhắn báo đã thêm thành công
   const updatedKeyboard = {
     inline_keyboard: [
-      [{ text: `🛍 Mở Giỏ Hàng (${totalCart} truyện)`, callback_data: "nav_cart" }],
+      [{ text: `🛍 Mở Giỏ Hàng (${totalCart} truyện)`, callback_data: "view_cart" }],
       [{ text: "🏠 Về Menu Chính", callback_data: "nav_main" }]
     ]
   };
