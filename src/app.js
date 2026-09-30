@@ -17,6 +17,7 @@ const { handleBookList, handleBookDetail, handleReadOwnedBook } = require('./han
 const { handleViewCart } = require('./handlers/cartHandler');
 const { handleMyBooks } = require('./handlers/myBooksHandler');
 const { handleCallbackQuery } = require('./handlers/callbackHandler');
+const { handleMultiBookSearch } = require('./handlers/multiSearchHandler');
 const {
   handleAdminDashboard,
   handleSetEventCommand,
@@ -24,7 +25,8 @@ const {
   handleAddVIPCommand,
   handleDelVIPCommand,
   handleBroadcastCommand,
-  handleReloadBooks
+  handleReloadBooks,
+  handleToggleAdminVip
 } = require('./handlers/adminHandler');
 
 // ======================
@@ -91,28 +93,38 @@ bot.onText(/\/ping/, async (msg) => {
 // 6. Lệnh Quản trị viên (Admin)
 bot.onText(/\/admin/, (msg) => handleAdminDashboard(bot, msg.chat.id));
 bot.onText(/\/reload/, (msg) => handleReloadBooks(bot, msg.chat.id));
+bot.onText(/\/togglevip/, (msg) => handleToggleAdminVip(bot, msg.chat.id));
 bot.onText(/\/setevent (.+)/, (msg, match) => handleSetEventCommand(bot, msg, match));
 bot.onText(/\/stopevent/, (msg) => handleStopEventCommand(bot, msg));
 bot.onText(/\/addvip (.+)/, (msg, match) => handleAddVIPCommand(bot, msg, match));
 bot.onText(/\/delvip (.+)/, (msg, match) => handleDelVIPCommand(bot, msg, match));
 bot.onText(/\/broadcast (.+)/, (msg, match) => handleBroadcastCommand(bot, msg, match));
 
-// 7. Xử lý tin nhắn gõ số ID truyện trực tiếp (Ví dụ gõ: "47" hoặc "#47")
+// 7. Xử lý tin nhắn gõ số ID truyện (Đơn lẻ như "47" hoặc nhiều truyện như "39 25 57 43")
 bot.on('message', async (msg) => {
   if (!msg.text || msg.text.startsWith('/')) return;
   const trimmed = msg.text.trim();
-  const match = trimmed.match(/^#?(\d+)$/);
-  if (match) {
-    const bookId = parseInt(match[1], 10);
+
+  // Trích xuất tất cả các ID số trong tin nhắn (có hoặc không có dấu #)
+  const matches = trimmed.match(/#?\b\d+\b/g);
+  if (!matches) return;
+
+  const rawIds = matches.map(m => parseInt(m.replace('#', ''), 10)).filter(n => !isNaN(n));
+  const uniqueIds = [...new Set(rawIds)];
+
+  if (uniqueIds.length === 1 && !trimmed.includes(' ') && !trimmed.includes(',')) {
+    // 1 truyện đơn lẻ -> Giữ nguyên hành vi cũ
+    const bookId = uniqueIds[0];
     const chatId = msg.chat.id;
     const isOwned = await hasUserPurchased(chatId, bookId);
     if (isOwned) {
-      // Đã mua -> Gửi link đọc ngay lập tức!
       return handleReadOwnedBook(bot, chatId, bookId);
     } else {
-      // Chưa mua -> Mở trang chi tiết truyện kèm nút Thêm giỏ hàng!
       return handleBookDetail(bot, chatId, bookId, 1);
     }
+  } else if (uniqueIds.length >= 1) {
+    // Tìm kiếm nhiều truyện cùng lúc (hoặc có định dạng danh sách)
+    return handleMultiBookSearch(bot, msg.chat.id, uniqueIds);
   }
 });
 

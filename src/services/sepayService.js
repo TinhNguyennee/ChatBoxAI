@@ -8,6 +8,7 @@ const { removeFromCart } = require('../database/cartRepo');
 const { cancelExpirationTimer } = require('./orderExpirationService');
 const { sendBookLinks } = require('./deliveryService');
 const { getOrderMessageId } = require('../database/cache');
+const { checkIsAdmin } = require('../handlers/adminHandler');
 
 /**
  * Xử lý webhook từ SePay khi có biến động số dư chuyển khoản
@@ -99,8 +100,12 @@ async function processSepayWebhook(bot, reqBody, authHeader) {
       const items = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
       const bookIds = items.map(b => b.id);
 
-      // Thêm vào Tủ truyện của người dùng
-      await addPurchases(chatId, bookIds, orderId);
+      // Thêm vào Tủ truyện của người dùng (BỎ QUA nếu người mua là Admin để Admin mua hộ/test)
+      if (!checkIsAdmin(chatId)) {
+        await addPurchases(chatId, bookIds, orderId);
+      } else {
+        console.log(`ℹ️ [Admin Exemption] Đơn hàng ${orderId} của Admin ${chatId} -> Không lưu vào Tủ truyện.`);
+      }
 
       // Tăng số lượng đã bán
       await incrementSoldQuantity(bookIds);

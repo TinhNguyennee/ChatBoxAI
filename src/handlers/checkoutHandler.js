@@ -11,6 +11,7 @@ const { sendBookLinks } = require('../services/deliveryService');
 const { getOrderPendingKeyboard } = require('../keyboards/cartKeyboards');
 const { BANK_ACCOUNT_NO, BANK_NAME, SUPPORT_USERNAME } = require('../config/env');
 const { ORDER_TYPE, ORDER_STATUS, ORDER_EXPIRATION_MINUTES } = require('../config/constants');
+const { checkIsAdmin } = require('./adminHandler');
 
 /**
  * Bắt đầu thanh toán giỏ hàng (Liệt kê rõ từng truyện trong hóa đơn, format HTML chuẩn đẹp)
@@ -42,7 +43,11 @@ async function handleCheckoutCart(bot, callbackQuery) {
         { parse_mode: 'HTML' }
       );
       const bookIds = cartItems.map(b => b.id);
-      await addPurchases(chatId, bookIds, 'FREE_ORDER');
+      if (!checkIsAdmin(chatId)) {
+        await addPurchases(chatId, bookIds, 'FREE_ORDER');
+      } else {
+        console.log(`ℹ️ [Admin Exemption] Đơn hàng Free của Admin ${chatId} -> Không lưu vào Tủ truyện.`);
+      }
       await incrementSoldQuantity(bookIds);
       await clearCart(chatId);
       await sendBookLinks(bot, chatId, cartItems, true);

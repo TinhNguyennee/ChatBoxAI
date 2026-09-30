@@ -67,16 +67,13 @@ async function handleOrderExpired(bot, orderId, chatId) {
 }
 
 /**
- * Tiến trình quét định kỳ dọn dẹp các đơn PENDING bị treo (chạy mỗi 1 phút)
+ * Tiến trình dọn dẹp các đơn PENDING quá hạn khi khởi động bot (Chạy đúng 1 lần duy nhất)
+ * Tuyệt đối không dùng vòng lặp hẹn giờ định kỳ để bảo vệ Compute của Neon PostgreSQL (cho phép Endpoint Inactive 0 CU)
+ * Các đơn hàng phát sinh trong lúc bot chạy đã được quản lý hoàn toàn bằng bộ nhớ RAM
  */
 function startExpirationWorker(bot) {
-  // Quét ngay khi khởi động
+  // Quét dọn dẹp đơn cũ tồn đọng đúng 1 lần khi khởi động
   sweepExpiredOrders(bot);
-
-  // Lặp lại mỗi 60 giây
-  setInterval(() => {
-    sweepExpiredOrders(bot);
-  }, 60 * 1000);
 }
 
 /**

@@ -117,11 +117,31 @@ async function clearCart(telegramId) {
   }
 }
 
+/**
+ * Thêm hàng loạt truyện vào giỏ hàng trong 1 truy vấn SQL duy nhất
+ */
+async function addMultipleToCart(telegramId, bookIds) {
+  if (!telegramId || !bookIds || bookIds.length === 0) return 0;
+  try {
+    const values = bookIds.map((id, idx) => `($1, $${idx + 2})`).join(', ');
+    const params = [telegramId.toString(), ...bookIds];
+    const res = await pool.query(
+      `INSERT INTO cart_items (telegram_id, book_id) VALUES ${values} ON CONFLICT DO NOTHING`,
+      params
+    );
+    return res.rowCount;
+  } catch (err) {
+    console.error('❌ Lỗi addMultipleToCart:', err.message);
+    return 0;
+  }
+}
+
 module.exports = {
   getCart,
   getCartCount,
   isBookInCart,
   addToCart,
+  addMultipleToCart,
   removeFromCart,
   clearCart
 };

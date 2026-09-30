@@ -1,4 +1,4 @@
-const { getBooks, getBookById } = require('../database/booksRepo');
+const { getBooks, getBookById, incrementSoldQuantity } = require('../database/booksRepo');
 const { getCartCount, isBookInCart } = require('../database/cartRepo');
 const { hasUserPurchased } = require('../database/purchasesRepo');
 const { isUserVIP } = require('../database/vipRepo');
@@ -160,6 +160,10 @@ async function handleReadFreeBook(bot, chatId, bookId) {
     );
 
     await sendBookLinks(bot, chatId, [book], true);
+
+    // Tự động tăng +1 lượt đọc/lượt bán cho truyện miễn phí vào Database & Cache
+    await incrementSoldQuantity([bookId]);
+    console.log(`🎁 [Free Book] Độc giả ${chatId} đọc truyện #${bookId} (${book.name}) -> +1 sold_quantity`);
   } catch (err) {
     console.error('❌ Lỗi handleReadFreeBook:', err.message);
   }

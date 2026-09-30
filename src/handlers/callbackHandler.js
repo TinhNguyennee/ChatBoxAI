@@ -3,13 +3,15 @@ const { handleBookList, handleBookDetail, handleReadFreeBook, handleReadOwnedBoo
 const { handleViewCart, handleAddToCart, handleRemoveFromCart, handleDropFromCart, handleClearCart } = require('./cartHandler');
 const { handleCheckoutCart, handleBuyVIP, handleCheckOrder, handleCancelOrder } = require('./checkoutHandler');
 const { handleMyBooks } = require('./myBooksHandler');
+const { handleBatchAddToCart } = require('./multiSearchHandler');
 const { 
   handleAdminDashboard, 
   handleAdminStats, 
   handleAdminEvent, 
   handleAdminVipPrompt, 
   handleAdminBroadcastPrompt,
-  handleReloadBooks 
+  handleReloadBooks,
+  handleToggleAdminVip 
 } = require('./adminHandler');
 
 /**
@@ -163,6 +165,15 @@ async function handleCallbackQuery(bot, callbackQuery) {
 
     if (data === 'admin_reload_books') {
       return handleReloadBooks(bot, chatId, callbackQuery.id);
+    }
+
+    if (data === 'admin_toggle_vip') {
+      return handleToggleAdminVip(bot, chatId, callbackQuery);
+    }
+
+    // 11. Thêm hàng loạt từ tìm kiếm nhiều truyện
+    if (data.startsWith('batch_cart:')) {
+      return handleBatchAddToCart(bot, callbackQuery);
     }
 
     // Mặc định phản hồi để không bị treo nút

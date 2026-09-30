@@ -1,7 +1,7 @@
 const { ADMIN_TELEGRAM_IDS } = require('../config/env');
 const { getRevenueStats } = require('../database/ordersRepo');
 const { getUserCount, getAllUserIds } = require('../database/usersRepo');
-const { getVIPCount, addToVIP, removeFromVIP } = require('../database/vipRepo');
+const { getVIPCount, addToVIP, removeFromVIP, isUserVIP } = require('../database/vipRepo');
 const { getTopSellingBooks, getBooks } = require('../database/booksRepo');
 const { clearBooksCache } = require('../database/cache');
 const { getActiveEvent, setEventStatus } = require('../database/eventsRepo');
@@ -12,10 +12,10 @@ const { getAdminDashboardKeyboard, getAdminBackKeyboard } = require('../keyboard
  */
 function checkIsAdmin(chatId) {
   if (!chatId) return false;
-  const env = require('../config/env');
-  const allowed = (env.ADMIN_TELEGRAM_IDS && env.ADMIN_TELEGRAM_IDS.length > 0)
-    ? env.ADMIN_TELEGRAM_IDS
-    : ['5638827352'];
+  const raw = process.env.ADMIN_TELEGRAM_IDS || process.env.ADMIN_ID || '';
+  const allowed = raw 
+    ? raw.split(',').map(id => id.trim()).filter(Boolean)
+    : (require('../config/env').ADMIN_TELEGRAM_IDS || []);
   return allowed.includes(chatId.toString().trim());
 }
 
@@ -31,7 +31,8 @@ async function handleAdminDashboard(bot, chatId, messageId = null) {
     `👑 <b>BẢNG ĐIỀU KHIỂN QUẢN TRỊ VIÊN (ADMIN)</b>\n\n` +
     `Chào mừng Admin! Bạn có thể xem thống kê kinh doanh, quản lý sự kiện khuyến mại hoặc gửi tin nhắn thông báo hàng loạt tại đây:`;
 
-  const keyboard = getAdminDashboardKeyboard();
+  const isVip = await isUserVIP(chatId);
+  const keyboard = getAdminDashboardKeyboard(isVip);
 
   if (messageId) {
     await bot.editMessageText(text, {
@@ -311,6 +312,40 @@ async function handleReloadBooks(bot, chatId, callbackQueryId = null) {
   await bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
 }
 
+/**
+ * Bật / Tắt quyền VIP cho chính tài khoản Admin
+ * (Giúp Admin linh hoạt đổi giữa giá gốc khi mua hộ khách thường và giá VIP khi mua hộ khách VIP)
+ */
+async function handleToggleAdminVip(bot, chatId, callbackQuery = null) {
+  if (!checkIsAdmin(chatId)) return;
+
+  const isVip = await isUserVIP(chatId);
+  let newVipState = false;
+
+  if (isVip) {
+    await removeFromVIP(chatId);
+    newVipState = false;
+  } else {
+    await addToVIP(chatId);
+    newVipState = true;
+  }
+
+  const alertText = newVipState
+    ? "🟢 Đã BẬT VIP cho Admin! (Tự động giảm giá 50% khi mua truyện)"
+    : "⚪ Đã TẮT VIP cho Admin! (Áp dụng giá gốc 100% để mua hộ khách thường)";
+
+  if (callbackQuery) {
+    await bot.answerCallbackQuery(callbackQuery.id, { text: alertText, show_alert: true }).catch(() => {});
+    const keyboard = getAdminDashboardKeyboard(newVipState);
+    await bot.editMessageReplyMarkup(keyboard, {
+      chat_id: chatId,
+      message_id: callbackQuery.message.message_id
+    }).catch(() => {});
+  } else {
+    await bot.sendMessage(chatId, `💎 <b>CẬP NHẬT VIP ADMIN:</b>\n\n${alertText}`, { parse_mode: 'HTML' });
+  }
+}
+
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -332,5 +367,6 @@ module.exports = {
   handleAddVIPCommand,
   handleDelVIPCommand,
   handleBroadcastCommand,
-  handleReloadBooks
+  handleReloadBooks,
+  handleToggleAdminVip
 };

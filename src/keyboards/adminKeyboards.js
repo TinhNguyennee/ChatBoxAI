@@ -1,7 +1,11 @@
 /**
  * Bàn phím bảng điều khiển Quản trị viên (Admin Dashboard)
  */
-function getAdminDashboardKeyboard() {
+function getAdminDashboardKeyboard(isAdminVip = false) {
+  const vipText = isAdminVip 
+    ? "💎 VIP Của Admin: [ĐANG BẬT] 🟢" 
+    : "💎 VIP Của Admin: [ĐANG TẮT] ⚪";
+
   return {
     inline_keyboard: [
       [
@@ -11,6 +15,9 @@ function getAdminDashboardKeyboard() {
       [
         { text: "💎 Cấp / Thu Hồi VIP", callback_data: "admin_vip_prompt" },
         { text: "📢 Broadcast Tin Nhắn", callback_data: "admin_broadcast_prompt" }
+      ],
+      [
+        { text: vipText, callback_data: "admin_toggle_vip" }
       ],
       [
         { text: "🔄 Làm Mới Kho Truyện (Xóa Cache)", callback_data: "admin_reload_books" }
